@@ -1,5 +1,5 @@
 -- Event configuration:
-local requiredSpeed = 50
+local requiredSpeed = 80
 
 -- Collision cooldown state
 local collisionCooldown = 0 -- Cooldown timer
@@ -25,16 +25,33 @@ local playerPreCollisionSpeed = 0 -- Track player's speed before collision
 -- Function to calculate collision severity based on speed loss
 local function handleCollision(player, otherCar)
   local speedLoss = playerPreCollisionSpeed - player.speedKmh
-  local severity = math.saturate(speedLoss / 50) -- Normalize severity based on speed loss (50 km/h = max severity)
+  local severity = math.saturate(speedLoss / 80) -- Normalize severity based on speed loss (80 km/h = max severity)
 
-  -- Deduct points based on severity, capped at 200
-  local pointsLost = math.ceil(200 * severity) -- Maximum of 200 points lost
-  totalScore = math.max(0, totalScore - pointsLost)
-  comboMeter = 1
-
-  if severity > 0.8 then
-    addMessage('Severe collision! Lost ' .. pointsLost .. ' points.', -1)
+  -- Deduct points based on severity
+  if severity > 0.9 then
+    -- Severe collision: reset score to 0
+    if totalScore > highestScore then
+      highestScore = math.floor(totalScore)
+      ac.sendChatMessage("Scored " .. totalScore .. " points before crash.")
+    end
+    totalScore = 0
+    comboMeter = 1
+    addMessage('Total wipeout! Score reset.', -1)
   else
+    -- Dynamic point deduction based on severity
+    local pointsLost = 0
+    if speedLoss >= 60 then
+      pointsLost = math.random(2000, 4000) -- Deduct 2000-4000 points for 60-80 km/h speed loss
+    elseif speedLoss >= 40 then
+      pointsLost = math.random(500, 1000) -- Deduct 500-1000 points for 40-60 km/h speed loss
+    elseif speedLoss >= 20 then
+      pointsLost = math.random(200, 400) -- Deduct 200-400 points for 20-40 km/h speed loss
+    else
+      pointsLost = math.random(50, 150) -- Deduct 50-150 points for <20 km/h speed loss
+    end
+
+    totalScore = math.max(0, totalScore - pointsLost)
+    comboMeter = 1
     addMessage('Collision: lost ' .. pointsLost .. ' points.', -1)
   end
 end
@@ -151,8 +168,6 @@ function script.update(dt)
   end
 end
 
--- Rest of the script (UI and message handling) remains unchanged
--- Rest of the script (UI and message handling) remains unchanged
 
 -- For various reasons, this is the most questionable part, some UI. I don’t really like
 -- this way though. So, yeah, still thinking about the best way to do it.
