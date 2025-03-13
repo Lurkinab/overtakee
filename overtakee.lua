@@ -1,5 +1,5 @@
 -- Event configuration:
-local requiredSpeed = 50
+local requiredSpeed = 80
 
 -- Collision cooldown state
 local collisionCooldown = 0 -- Cooldown timer
@@ -8,10 +8,7 @@ local collisionCooldownDuration = 2 -- Cooldown duration in seconds
 -- Combo multiplier cap
 local maxComboMultiplier = 10 -- Maximum combo multiplier
 
--- Strike system state
-local collisionStrikes = 0 -- Number of collisions in the current strike cycle
-
--- This function is called before event activates. Once it returns true, it’ll run:
+-- This function is called before event activates. Once it returns true, it'll run:
 function script.prepare(dt)
   ac.debug('speed', ac.getCarState(1).speedKmh)
   return ac.getCarState(1).speedKmh > 60
@@ -28,41 +25,79 @@ local carsState = {}
 local wheelsWarningTimeout = 0
 local playerPreCollisionSpeed = 0 -- Track player's speed before collision
 
--- Function to handle collisions based on the strike system
+-- Function to calculate collision severity based on speed loss
 local function handleCollision(player, otherCar)
-  collisionStrikes = collisionStrikes + 1
+  local speedLoss = playerPreCollisionSpeed - player.speedKmh
+  -- Adjusted severity calculation with higher weight on higher speeds
+  local severity = math.saturate(speedLoss / 150) -- Normalize severity based on speed loss (150 km/h = max severity)
 
-  if collisionStrikes == 1 then
-    -- First collision: deduct 750 points
-    totalScore = math.max(0, totalScore - 750)
-    comboMeter = 1
-    addMessage('First collision! Lost 750 points.', -1)
-  elseif collisionStrikes == 2 then
-    -- Second collision: deduct 2000 points
-    totalScore = math.max(0, totalScore - 2000)
-    comboMeter = 1
-    addMessage('Second collision! Lost 2000 points.', -1)
-  elseif collisionStrikes == 3 then
-    -- Third collision: deduct 5000 points
-    totalScore = math.max(0, totalScore - 5000)
-    comboMeter = 1
-    addMessage('Third collision! Lost 5000 points.', -1)
-  else
-    -- Fourth collision: reset score to 0
+  -- Deduct points based on severity
+  if severity > 0.8 then
+    -- Severe collision: reset score to 0
     if totalScore > highestScore then
       highestScore = math.floor(totalScore)
-      ac.sendChatMessage("Scored " .. totalScore .. " points before wipeout.")
+      ac.sendChatMessage("Scored " .. totalScore .. " points before major crash.")
     end
     totalScore = 0
     comboMeter = 1
-    collisionStrikes = 0 -- Reset strike counter
-    addMessage('Total wipeout! Score reset.', -1)
+    addMessage('MAJOR CRASH! Score reset.', -1)
+  else
+    -- Dynamic point deduction based on severity with higher penalties
+    local pointsLost = 0
+    
+    -- More aggressive point deduction scale for higher speeds
+    if speedLoss >= 100 then
+      -- Very severe collision (100+ km/h speed loss)
+      pointsLost = math.random(4000, 8000) -- Much higher deduction for major crashes
+      addMessage('SEVERE collision!', -1)
+    elseif speedLoss >= 70 then
+      -- Severe collision (70-100 km/h speed loss)
+      pointsLost = math.random(2000, 4000) 
+      addMessage('Major collision!', -1)
+    elseif speedLoss >= 40 then
+      -- Medium collision (40-70 km/h speed loss)
+      pointsLost = math.random(1000, 2000)
+      addMessage('Significant collision!', -1)
+    elseif speedLoss >= 20 then
+      -- Minor collision (20-40 km/h speed loss)
+      pointsLost = math.random(500, 1000)
+      addMessage('Minor collision', -1)
+    else
+      -- Scratch/very minor collision (<20 km/h speed loss)
+      pointsLost = math.random(100, 300)
+      addMessage('Scratch collision', -1)
+    end
+    
+    -- For high speed driving, apply a multiplier to make penalties even more severe
+    if playerPreCollisionSpeed > 150 then
+      local speedMultiplier = 1 + ((playerPreCollisionSpeed - 150) / 100)
+      pointsLost = math.floor(pointsLost * speedMultiplier)
+    end
+
+    -- Apply the point deduction
+    local oldScore = totalScore
+    totalScore = math.max(0, totalScore - pointsLost)
+    
+    -- Notify player of points lost
+    addMessage('Lost ' .. pointsLost .. ' points!', -1)
+    
+    -- Reset combo meter on significant collisions
+    if speedLoss > 30 then
+      comboMeter = 1
+      addMessage('Combo reset!', -1)
+    else
+      -- Reduce combo meter for minor collisions
+      comboMeter = math.max(1, comboMeter * 0.5)
+    end
   end
+  
+  -- Add cooldown effect to prevent multiple collision penalties in quick succession
+  collisionCooldown = collisionCooldownDuration
 end
 
 function script.update(dt)
   if timePassed == 0 then
-    addMessage('Let’s go!', 0)
+    addMessage('Let's go!', 0)
   end
 
   local player = ac.getCarState(1)
@@ -73,7 +108,6 @@ function script.update(dt)
     end
     totalScore = 0
     comboMeter = 1
-    collisionStrikes = 0 -- Reset strike counter
     return
   end
 
@@ -112,7 +146,6 @@ function script.update(dt)
       end
       totalScore = 0
       comboMeter = 1
-      collisionStrikes = 0 -- Reset strike counter
     else
       if dangerouslySlowTimer == 0 then addMessage('Too slow!', -1) end
     end
@@ -177,7 +210,30 @@ function script.update(dt)
   end
 end
 
--- Rest of the script (UI and message handling) remains unchanged
+-- UI and message handling
+local messages = {}
+local glitter = {}
+local glitterCount = 0
+
+function addMessage(text, mood)
+  for i = math.min(#messages + 1, 4), 2, -1 do
+    messages[i] = messages[i - 1]
+    messages[i].targetPos = i
+  end
+  messages[1] = { text = text, age = 0, targetPos = 1, currentPos = 1, mood = mood }
+  if mood == 1 then
+    for i = 1, 60 do
+      local dir = vec2(math.random() - 0.5, math.random() - 0.5)
+      glitterCount = glitterCount + 1
+      glitter[glitterCount] = { 
+        color = rgbm.new(hsv(math.random() * 360, 1, 1):rgb(), 1), 
+        pos = vec2(80, 140) + dir * vec2(40, 20),
+        velocity = dir:normalize():scale(0.2 + math.random()),
+        life = 0.5 + 0.5 * math.random()
+      }
+    end
+  end
+end
 
 local function updateMessages(dt)
   comboColor = comboColor + dt * 10 * comboMeter
@@ -254,21 +310,8 @@ function script.drawUI()
   ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'x', colorCombo)
   if comboMeter > 20 then
     ui.endRotation(math.sin(comboMeter / 180 * 3141.5) * 3 * math.lerpInvSat(comboMeter, 20, 30) + 90)
-  else
-    ui.endRotation(0)
   end
   ui.popFont()
-  
-  -- Display current strikes
-  ui.offsetCursorY(5)
-  ui.pushFont(ui.Font.Main)
-  local strikeColor = strikes == 0 and rgbm(0.2, 1, 0.2, 1) or 
-                     strikes == 1 and rgbm(1, 0.8, 0.2, 1) or
-                     strikes == 2 and rgbm(1, 0.5, 0.2, 1) or
-                     rgbm(1, 0.2, 0.2, 1)
-  ui.textColored('Strikes: ' .. strikes .. '/' .. maxStrikes, strikeColor)
-  ui.popFont()
-  
   ui.endOutline(rgbm(0, 0, 0, 0.3))
   
   ui.offsetCursorY(20)
