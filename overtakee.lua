@@ -30,36 +30,19 @@ local eventState = {
   glitterCount = 0, -- Number of active glitter particles
 }
 
--- Function to calculate collision severity based on speed loss
+-- Function to handle collisions
 local function handleCollision(player, otherCar)
   local speedLoss = eventState.playerPreCollisionSpeed - player.speedKmh
-  local severity = math.saturate(speedLoss / math.max(eventState.playerPreCollisionSpeed, 150))
 
-  if severity > 0.8 then
-    -- Major crash: reduce score to 10% of its original value
-    eventState.totalScore = math.floor(eventState.totalScore * 0.1)
+  if speedLoss > 50 then
+    -- Major collision: reset score to 0
+    eventState.totalScore = 0
     eventState.comboMeter = 1
-    addMessage('MAJOR CRASH! Score reduced.', -1)
+    addMessage('MAJOR CRASH! Score reset.', -1)
   else
-    -- Dynamic point deduction based on severity
-    local pointsLost = math.floor(eventState.totalScore * severity * 0.5)
-
-    -- Apply speed multiplier for high-speed collisions
-    if eventState.playerPreCollisionSpeed > 150 then
-      local speedMultiplier = 1 + ((eventState.playerPreCollisionSpeed - 150) / 100)
-      pointsLost = math.floor(pointsLost * speedMultiplier)
-    end
-
-    -- Apply the point deduction
-    eventState.totalScore = math.max(0, eventState.totalScore - pointsLost)
-    addMessage('Lost ' .. pointsLost .. ' points (Speed loss: ' .. math.floor(speedLoss) .. ' km/h)', -1)
-
-    -- Adjust combo meter
-    if speedLoss > 30 then
-      eventState.comboMeter = 1 -- Reset for significant collisions
-    else
-      eventState.comboMeter = math.max(1, eventState.comboMeter * 0.75) -- Reduce for minor collisions
-    end
+    -- Minor collision: deduct 1000 points
+    eventState.totalScore = math.max(0, eventState.totalScore - 1000)
+    addMessage('Collision! Lost 1000 points.', -1)
   end
 
   -- Start collision cooldown
@@ -160,6 +143,19 @@ function script.update(dt)
   -- Update player's pre-collision speed
   eventState.playerPreCollisionSpeed = player.speedKmh
 
+  -- Handle dangerously slow speed
+  if player.speedKmh < requiredSpeed then
+    eventState.dangerouslySlowTimer = eventState.dangerouslySlowTimer + dt
+    if eventState.dangerouslySlowTimer > 10 then
+      eventState.totalScore = 0
+      eventState.comboMeter = 1
+      addMessage('Too slow! Score reset.', -1)
+      eventState.dangerouslySlowTimer = 0 -- Reset the timer
+    end
+  else
+    eventState.dangerouslySlowTimer = 0 -- Reset the timer if speed is above required
+  end
+
   -- Handle collisions, near misses, and overtakes
   for i = 1, ac.getSimState().carsCount do
     local car = ac.getCarState(i)
@@ -171,16 +167,10 @@ function script.update(dt)
       if not drivingAlong then
         state.drivingAlong = false
 
-        if not state.nearMiss and car.pos:closerToThan(player.pos, 3) then
+        if not state.nearMiss and car.pos:closerToThan(player.pos, 2.5) then -- Adjusted distance for near miss
           state.nearMiss = true
-
-          if car.pos:closerToThan(player.pos, 2.5) then
-            eventState.comboMeter = eventState.comboMeter + 3
-            addMessage('Very close near miss!', 1)
-          else
-            eventState.comboMeter = eventState.comboMeter + 1
-            addMessage('Near miss: bonus combo', 0)
-          end
+          eventState.comboMeter = eventState.comboMeter + 1
+          addMessage('Near miss: bonus combo', 0)
         end
       end
 
