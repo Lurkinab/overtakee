@@ -145,50 +145,19 @@ end
 
 -- UI and message handling
 local messages = {}
-local glitter = {}
-local glitterCount = 0
 
 function addMessage(text, mood)
   if #messages >= 4 then
     table.remove(messages, 4)
   end
   table.insert(messages, 1, { text = text, age = 0, targetPos = 1, currentPos = 1, mood = mood })
-
-  -- Add glitter for positive messages
-  if mood == 1 then
-    for i = 1, 30 do -- Reduced number of particles
-      local dir = vec2(math.random() - 0.5, math.random() - 0.5)
-      glitterCount = glitterCount + 1
-      glitter[glitterCount] = { 
-        color = rgbm.new(hsv(math.random() * 360, 1, 1):rgb(), 1), 
-        pos = vec2(80, 140) + dir * vec2(40, 20),
-        velocity = dir:normalize():scale(0.2 + math.random()),
-        life = 0.5 + 0.5 * math.random()
-      }
-    end
-  end
 end
 
 local function updateMessages(dt)
-  comboColor = comboColor + dt * 10 * comboMeter
-  if comboColor > 360 then comboColor = comboColor - 360 end
   for i = 1, #messages do
     local m = messages[i]
     m.age = m.age + dt
     m.currentPos = math.applyLag(m.currentPos, m.targetPos, 0.8, dt)
-  end
-  for i = glitterCount, 1, -1 do
-    local g = glitter[i]
-    g.pos:add(g.velocity)
-    g.velocity.y = g.velocity.y + 0.02
-    g.life = g.life - dt
-    g.color.mult = math.saturate(g.life * 4)
-    if g.life < 0 then
-      if i < glitterCount then
-        glitter[i] = glitter[glitterCount]
-      end
-      glitterCount = glitterCount - 1
-    end
   end
 end
 
@@ -197,26 +166,26 @@ function script.drawUI()
   updateMessages(uiState.dt)
 
   -- UI colors
-  local backgroundColor = rgbm(1, 1, 1, 0.9) -- White background with 90% opacity
-  local textColor = rgbm(0, 0, 0, 1) -- Black text
+  local backgroundColor = rgbm(0.1, 0.1, 0.1, 0.9) -- Dark background
+  local textColor = rgbm(1, 1, 1, 1) -- White text
   local comboColorUI = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
   -- Draw the score and collision counter
-  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 200, 100), vec2(400, 300))
+  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 150, 100), vec2(300, 200))
   ui.beginOutline()
 
   -- Draw background
-  ui.drawRectFilled(vec2(0, 0), vec2(400, 300), backgroundColor, 1)
+  ui.drawRectFilled(vec2(0, 0), vec2(300, 200), backgroundColor, 1)
 
-  -- Score and combo
+  -- Score
   ui.pushFont(ui.Font.Huge)
   ui.textColored(totalScore .. ' pts', textColor)
-  ui.sameLine(0, 40)
-  ui.beginRotation()
-  ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'x', comboColorUI)
-  if comboMeter > 20 then
-    ui.endRotation(math.sin(comboMeter / 180 * 3141.5) * 3 * math.lerpInvSat(comboMeter, 20, 30) + 90)
-  end
+  ui.popFont()
+
+  -- Combo multiplier
+  ui.offsetCursorY(20)
+  ui.pushFont(ui.Font.Main)
+  ui.textColored('Combo: ' .. math.ceil(comboMeter * 10) / 10 .. 'x', comboColorUI)
   ui.popFont()
 
   -- Collision counter
@@ -234,14 +203,6 @@ function script.drawUI()
     ui.textColored(m.text, m.mood == 1 and rgbm(0, 1, 0, 1) or m.mood == -1 and rgbm(1, 0, 0, 1) or textColor)
   end
   ui.popFont()
-
-  -- Glitter effects
-  for i = 1, glitterCount do
-    local g = glitter[i]
-    if g then
-      ui.drawLine(g.pos, g.pos + g.velocity * 4, g.color, 2)
-    end
-  end
 
   ui.endOutline(rgbm(0, 0, 0, 0.3))
   ui.endTransparentWindow()
