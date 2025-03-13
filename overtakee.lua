@@ -185,7 +185,7 @@ function script.update(dt)
 
     if car.pos:closerToThan(player.pos, 10) then
       -- Check for collisions
-      if car.collidedWith == 0 and collisionCooldown <= 0 then
+      if car.collidedWith == 0 and collisionCooldown <= 0 and not state.collided then
         handleCollision(player, car)
         state.collided = true
         collisionCooldown = collisionCooldownDuration
