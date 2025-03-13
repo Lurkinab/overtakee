@@ -1,3 +1,4 @@
+-- Event configuration:
 local requiredSpeed = 80
 
 -- Collision cooldown state
@@ -27,6 +28,32 @@ local dangerouslySlowTimer = 0
 local carsState = {}
 local wheelsWarningTimeout = 0
 local playerPreCollisionSpeed = 0 -- Track player's speed before collision
+
+-- For various reasons, this is the most questionable part, some UI. I don't really like
+-- this way though. So, yeah, still thinking about the best way to do it.
+local messages = {}
+local glitter = {}
+local glitterCount = 0
+
+function addMessage(text, mood)
+  for i = math.min(#messages + 1, 4), 2, -1 do
+    messages[i] = messages[i - 1]
+    messages[i].targetPos = i
+  end
+  messages[1] = { text = text, age = 0, targetPos = 1, currentPos = 1, mood = mood }
+  if mood == 1 then
+    for i = 1, 60 do
+      local dir = vec2(math.random() - 0.5, math.random() - 0.5)
+      glitterCount = glitterCount + 1
+      glitter[glitterCount] = { 
+        color = rgbm.new(hsv(math.random() * 360, 1, 1):rgb(), 1), 
+        pos = vec2(80, 140) + dir * vec2(40, 20),
+        velocity = dir:normalize():scale(0.2 + math.random()),
+        life = 0.5 + 0.5 * math.random()
+      }
+    end
+  end
+end
 
 -- Function to handle the 3-strike collision system
 local function handleCollision(player, otherCar)
@@ -130,6 +157,14 @@ function script.update(dt)
     local car = ac.getCarState(i)
     local state = carsState[i]
 
+    if not state.maxPosDot then
+      state.maxPosDot = -1
+      state.overtaken = false
+      state.collided = false
+      state.drivingAlong = true
+      state.nearMiss = false
+    end
+
     if car.pos:closerToThan(player.pos, 10) then
       local drivingAlong = math.dot(car.look, player.look) > 0.2
       if not drivingAlong then
@@ -173,34 +208,6 @@ function script.update(dt)
       state.collided = false
       state.drivingAlong = true
       state.nearMiss = false
-    end
-  end
-end
-
--- Rest of the script (UI and message handling) remains unchanged
-
--- For various reasons, this is the most questionable part, some UI. I don't really like
--- this way though. So, yeah, still thinking about the best way to do it.
-local messages = {}
-local glitter = {}
-local glitterCount = 0
-
-function addMessage(text, mood)
-  for i = math.min(#messages + 1, 4), 2, -1 do
-    messages[i] = messages[i - 1]
-    messages[i].targetPos = i
-  end
-  messages[1] = { text = text, age = 0, targetPos = 1, currentPos = 1, mood = mood }
-  if mood == 1 then
-    for i = 1, 60 do
-      local dir = vec2(math.random() - 0.5, math.random() - 0.5)
-      glitterCount = glitterCount + 1
-      glitter[glitterCount] = { 
-        color = rgbm.new(hsv(math.random() * 360, 1, 1):rgb(), 1), 
-        pos = vec2(80, 140) + dir * vec2(40, 20),
-        velocity = dir:normalize():scale(0.2 + math.random()),
-        life = 0.5 + 0.5 * math.random()
-      }
     end
   end
 end
@@ -280,6 +287,8 @@ function script.drawUI()
   ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'x', colorCombo)
   if comboMeter > 20 then
     ui.endRotation(math.sin(comboMeter / 180 * 3141.5) * 3 * math.lerpInvSat(comboMeter, 20, 30) + 90)
+  else
+    ui.endRotation(0)
   end
   ui.popFont()
   
