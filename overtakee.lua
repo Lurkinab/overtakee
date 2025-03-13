@@ -12,6 +12,9 @@ local maxComboMultiplier = 10 -- Maximum combo multiplier
 local collisionCounter = 0 -- Tracks the number of collisions
 local maxCollisions = 5 -- Maximum allowed collisions before score reset
 
+-- Leaderboard state
+local leaderboard = {} -- Stores player names and PBs
+
 -- This function is called before event activates. Once it returns true, it’ll run:
 function script.prepare(dt)
   ac.debug('speed', ac.getCarState(1).speedKmh)
@@ -83,8 +86,8 @@ function script.update(dt)
   -- Cap the combo multiplier at maxComboMultiplier
   comboMeter = math.min(comboMeter, maxComboMultiplier)
 
-  -- Adjust combo fading rate to be slower, giving more time for chaining combos
-  local comboFadingRate = 0.25 * math.lerp(1, 0.1, math.lerpInvSat(player.speedKmh, 80, 200)) + player.wheelsOutside
+  -- Combo fading rate based on speed and wheels outside
+  local comboFadingRate = 0.2 * math.lerp(1, 0.1, math.lerpInvSat(player.speedKmh, 80, 200)) + player.wheelsOutside
   comboMeter = math.max(1, comboMeter - dt * comboFadingRate)
 
   -- Check if player is too slow
@@ -149,69 +152,57 @@ function script.update(dt)
   end
 end
 
+-- UI and message handling
 function script.drawUI()
   local uiState = ac.getUiState()
 
   -- UI colors
-  local backgroundColor = rgbm(0.05, 0.05, 0.05, 0.9) -- Darker background
+  local backgroundColor = rgbm(0.1, 0.1, 0.1, 0.9) -- Dark background
   local textColor = rgbm(1, 1, 1, 1) -- White text
   local comboColorUI = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
-  -- Leaderboard Box for other players' PBs (added box to the left)
-  ui.beginTransparentWindow('leaderboardBox', vec2(uiState.windowSize.x * 0.5 - 600, 100), vec2(300, 200))
-  ui.beginOutline()
-  
-  -- Draw background for leaderboard
-  ui.drawRectFilled(vec2(0, 0), vec2(300, 200), backgroundColor, 1)
-  
-  -- Leaderboard header
-  ui.pushFont(ui.Font.Main)
-  ui.setCursor(vec2(10, 10))
-  ui.textColored("Leaderboards:", textColor)
-  ui.popFont()
-
-  -- List other players’ PBs (top down)
-  for i = 1, sim.carsCount do
-    local car = ac.getCarState(i)
-    local playerName = ac.getDriverName(i)
-    local playerPB = carsState[i] and carsState[i].highestScore or 0
-    ui.textColored(playerName .. ": " .. playerPB .. " PTS", textColor)
-  end
-
-  ui.endOutline(rgbm(0, 0, 0, 0.3))
-  ui.endTransparentWindow()
-
-  -- Score and collision counter box
-  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 200, 100), vec2(400, 100))
+  -- Draw the score and collision counter
+  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 250, 100), vec2(500, 300))
   ui.beginOutline()
 
-  -- Draw background for score
-  ui.drawRectFilled(vec2(0, 0), vec2(400, 100), backgroundColor, 1)
+  -- Draw background
+  ui.drawRectFilled(vec2(0, 0), vec2(500, 300), backgroundColor, 1)
 
-  -- Multipliers and layout
+  -- Multipliers side by side
   ui.pushFont(ui.Font.Main)
   ui.setCursor(vec2(10, 10))
   ui.textColored('1.0X Speed', textColor)
   ui.sameLine(0, 20)
-  ui.textColored('1.8X Proximity', textColor)
+  ui.textColored('1.0X Proximity', textColor)
   ui.sameLine(0, 20)
   ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'X Combo', comboColorUI)
   ui.popFont()
 
-  -- Score box with collision counter
-  ui.offsetCursorY(30)
+  -- Score and collision counter
+  ui.offsetCursorY(20)
   ui.pushFont(ui.Font.Huge)
-  ui.textColored(totalScore .. ' PTS', textColor) -- Make the text smaller for better fitting
-  ui.sameLine(0, 40) -- Increase spacing between PTS and collision counter
-  ui.pushFont(ui.Font.Huge)
-  ui.textColored(collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1)) -- Bigger collision counter with better spacing
+  ui.textColored(totalScore .. ' PTS', textColor)
+  ui.sameLine(0, 40)
+  ui.pushFont(ui.Font.Large)
+  ui.textColored(collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1)) -- Red text for collisions
   ui.popFont()
   ui.popFont()
 
-  -- PB (Personal Best) aligned below the score
-  ui.offsetCursorY(10)
+  -- PB (Personal Best)
+  ui.offsetCursorY(20)
   ui.pushFont(ui.Font.Main)
   ui.textColored('PB: ' .. highestScore, textColor)
+  ui.popFont()
+
+  -- Leaderboard
+  ui.offsetCursorY(20)
+  ui.pushFont(ui.Font.Main)
+  ui.textColored('Leaderboard', textColor)
+  ui.offsetCursorY(10)
+  for i = 1, math.min(#leaderboard, 5) do
+    local entry = leaderboard[i]
+    ui.textColored(entry.name .. ': ' .. entry.pb, textColor)
+  end
   ui.popFont()
 
   ui.endOutline(rgbm(0, 0, 0, 0.3))
