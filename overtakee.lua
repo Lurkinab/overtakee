@@ -144,7 +144,6 @@ function script.update(dt)
           totalScore = totalScore + math.ceil(10 * comboMeter)
           comboMeter = comboMeter + 1
           comboColor = comboColor + 90
-          addMessage('Overtake', comboMeter > 20 and 1 or 0)
           state.overtaken = true
         end
       end
@@ -188,27 +187,37 @@ function script.drawUI()
   local comboColorUI = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
   -- Draw the score and collision counter
-  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 150, 100), vec2(300, 150))
+  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 150, 100), vec2(300, 200))
   ui.beginOutline()
 
   -- Draw background
-  ui.drawRectFilled(vec2(0, 0), vec2(300, 150), backgroundColor, 1)
+  ui.drawRectFilled(vec2(0, 0), vec2(300, 200), backgroundColor, 1)
 
-  -- Score
-  ui.pushFont(ui.Font.Huge)
-  ui.textColored(totalScore .. ' pts', textColor)
+  -- Multipliers on top
+  ui.pushFont(ui.Font.Main)
+  ui.textColored('1.0X  Speed', textColor)
+  ui.offsetCursorY(10)
+  ui.textColored('1.0X  Proximity', textColor)
+  ui.offsetCursorY(10)
+  ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'X  Combo', comboColorUI)
   ui.popFont()
 
-  -- Combo multiplier
-  ui.offsetCursorY(10)
-  ui.pushFont(ui.Font.Main)
-  ui.textColored('Combo: ' .. math.ceil(comboMeter * 10) / 10 .. 'x', comboColorUI)
+  -- Score
+  ui.offsetCursorY(20)
+  ui.pushFont(ui.Font.Huge)
+  ui.textColored(totalScore .. ' pts', textColor)
   ui.popFont()
 
   -- Collision counter
   ui.offsetCursorY(10)
   ui.pushFont(ui.Font.Main)
-  ui.textColored('Collisions: ' .. collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1)) -- Red text for collisions
+  ui.textColored(collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1)) -- Red text for collisions
+  ui.popFont()
+
+  -- PB (Personal Best)
+  ui.offsetCursorY(20)
+  ui.pushFont(ui.Font.Main)
+  ui.textColored('PB: ' .. highestScore, textColor)
   ui.popFont()
 
   -- Messages
@@ -216,7 +225,7 @@ function script.drawUI()
   ui.pushFont(ui.Font.Main)
   for i = 1, #messages do
     local m = messages[i]
-    ui.setCursor(vec2(20, 80 + (i - 1) * 20))
+    ui.setCursor(vec2(20, 160 + (i - 1) * 20))
     ui.textColored(m.text, m.mood == 1 and rgbm(0, 1, 0, 1) or m.mood == -1 and rgbm(1, 0, 0, 1) or textColor)
   end
   ui.popFont()
