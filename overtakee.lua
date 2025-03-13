@@ -14,8 +14,8 @@ local maxCollisions = 5 -- Maximum allowed collisions before score reset
 
 -- This function is called before event activates. Once it returns true, it’ll run:
 function script.prepare(dt)
-  ac.debug('speed', ac.getCarState(0).speedKmh)
-  return ac.getCarState(0).speedKmh > 60
+  ac.debug('speed', ac.getCarState(1).speedKmh)
+  return ac.getCarState(1).speedKmh > 60
 end
 
 -- Event state:
@@ -64,7 +64,7 @@ local function isCarNearby(player, car, radius)
 end
 
 function script.update(dt)
-  local player = ac.getCarState(0)
+  local player = ac.getCarState(1)
   local sim = ac.getSimState()
 
   -- Reset score if engine is dead
@@ -159,11 +159,11 @@ function script.drawUI()
   local comboColorUI = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
   -- Draw the score and collision counter
-  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 150, 100), vec2(300, 150))
+  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 200, 100), vec2(400, 200))
   ui.beginOutline()
 
   -- Draw background
-  ui.drawRectFilled(vec2(0, 0), vec2(300, 150), backgroundColor, 1)
+  ui.drawRectFilled(vec2(0, 0), vec2(400, 200), backgroundColor, 1)
 
   -- Multipliers side by side
   ui.pushFont(ui.Font.Main)
@@ -175,16 +175,20 @@ function script.drawUI()
   ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'X Combo', comboColorUI)
   ui.popFont()
 
-  -- Score
+  -- Score and collision counter
   ui.offsetCursorY(20)
   ui.pushFont(ui.Font.Huge)
-  ui.textColored(totalScore .. ' pts', textColor)
-  ui.popFont()
-
-  -- Collision counter
-  ui.offsetCursorY(10)
+  ui.textColored(totalScore .. ' PTS', textColor)
+  ui.sameLine(0, 20)
   ui.pushFont(ui.Font.Main)
   ui.textColored(collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1)) -- Red text for collisions
+  ui.popFont()
+  ui.popFont()
+
+  -- PB (Personal Best)
+  ui.offsetCursorY(20)
+  ui.pushFont(ui.Font.Main)
+  ui.textColored('PB: ' .. highestScore, textColor)
   ui.popFont()
 
   ui.endOutline(rgbm(0, 0, 0, 0.3))
