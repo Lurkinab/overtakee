@@ -149,50 +149,49 @@ function script.update(dt)
   end
 end
 
--- UI and message handling
 function script.drawUI()
   local uiState = ac.getUiState()
 
   -- UI colors
-  local backgroundColor = rgbm(0.1, 0.1, 0.1, 0.9) -- Dark background
+  local backgroundColor = rgbm(0.05, 0.05, 0.05, 0.9) -- Darker background
   local textColor = rgbm(1, 1, 1, 1) -- White text
   local comboColorUI = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
-  -- Draw the score and collision counter
-  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 200, 100), vec2(400, 200))
+  -- Draw the score and new collision counter at the bottom right
+  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 200, 100), vec2(400, 100))
   ui.beginOutline()
 
-  -- Draw background
-  ui.drawRectFilled(vec2(0, 0), vec2(400, 200), backgroundColor, 1)
+  -- Background
+  ui.drawRectFilled(vec2(0, 0), vec2(400, 100), backgroundColor, 1)
 
-  -- Multipliers side by side
+  -- Multipliers and layout to resemble the reference
   ui.pushFont(ui.Font.Main)
   ui.setCursor(vec2(10, 10))
   ui.textColored('1.0X Speed', textColor)
   ui.sameLine(0, 20)
-  ui.textColored('1.0X Proximity', textColor)
+  ui.textColored('1.8X Proximity', textColor)
   ui.sameLine(0, 20)
   ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'X Combo', comboColorUI)
   ui.popFont()
 
-  -- Score and enlarged collision counter with slanted font
-  ui.offsetCursorY(20)
+  -- Score box with collision counter on the right where the time was
+  ui.offsetCursorY(30)
   ui.pushFont(ui.Font.Huge)
   ui.textColored(totalScore .. ' PTS', textColor)
-  ui.sameLine(0, 50)  -- Move collision counter further to the right
+  ui.sameLine(0, 20) -- Space between score and collision counter
   ui.pushFont(ui.Font.Main)
-  ui.textColored(collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1)) -- Red text for collisions
+  ui.textColored(collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1)) -- Red collision text where "00:00" was
   ui.popFont()
   ui.popFont()
 
-  -- PB (Personal Best)
-  ui.offsetCursorY(20)
+  -- Draw highest score (PB) on the left (match layout)
+  ui.offsetCursorY(-70) -- Align with the PB layout from the reference
   ui.pushFont(ui.Font.Main)
   ui.textColored('PB: ' .. highestScore, textColor)
   ui.popFont()
 
-  -- Leaderboard section with clean layout
-  ui.offsetCursorY(20)
+  -- Leaderboard below the score
+  ui.offsetCursorY(30)
   ui.pushFont(ui.Font.Main)
   ui.textColored('Leaderboards:', textColor)
   for i = 1, sim.carsCount do
