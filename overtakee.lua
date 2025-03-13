@@ -5,6 +5,9 @@ local requiredSpeed = 80
 local collisionCooldown = 0 -- Cooldown timer
 local collisionCooldownDuration = 2 -- Cooldown duration in seconds
 
+-- Combo multiplier cap
+local maxComboMultiplier = 10 -- Maximum combo multiplier
+
 -- This function is called before event activates. Once it returns true, it’ll run:
 function script.prepare(dt)
   ac.debug('speed', ac.getCarState(1).speedKmh)
@@ -25,7 +28,7 @@ local playerPreCollisionSpeed = 0 -- Track player's speed before collision
 -- Function to calculate collision severity based on speed loss
 local function handleCollision(player, otherCar)
   local speedLoss = playerPreCollisionSpeed - player.speedKmh
-  local severity = math.saturate(speedLoss / 80) -- Normalize severity based on speed loss (80 km/h = max severity)
+  local severity = math.saturate(speedLoss / 200) -- Normalize severity based on speed loss (200 km/h = max severity)
 
   -- Deduct points based on severity
   if severity > 0.9 then
@@ -40,12 +43,14 @@ local function handleCollision(player, otherCar)
   else
     -- Dynamic point deduction based on severity
     local pointsLost = 0
-    if speedLoss >= 60 then
-      pointsLost = math.random(2000, 4000) -- Deduct 2000-4000 points for 60-80 km/h speed loss
-    elseif speedLoss >= 40 then
-      pointsLost = math.random(500, 1000) -- Deduct 500-1000 points for 40-60 km/h speed loss
+    if speedLoss >= 150 then
+      pointsLost = math.random(2000, 4000) -- Deduct 2000-4000 points for 150+ km/h speed loss
+    elseif speedLoss >= 100 then
+      pointsLost = math.random(1000, 2000) -- Deduct 1000-2000 points for 100-150 km/h speed loss
+    elseif speedLoss >= 50 then
+      pointsLost = math.random(500, 1000) -- Deduct 500-1000 points for 50-100 km/h speed loss
     elseif speedLoss >= 20 then
-      pointsLost = math.random(200, 400) -- Deduct 200-400 points for 20-40 km/h speed loss
+      pointsLost = math.random(200, 400) -- Deduct 200-400 points for 20-50 km/h speed loss
     else
       pointsLost = math.random(50, 150) -- Deduct 50-150 points for <20 km/h speed loss
     end
@@ -78,6 +83,9 @@ function script.update(dt)
   if collisionCooldown > 0 then
     collisionCooldown = collisionCooldown - dt
   end
+
+  -- Cap the combo multiplier at maxComboMultiplier
+  comboMeter = math.min(comboMeter, maxComboMultiplier)
 
   local comboFadingRate = 0.5 * math.lerp(1, 0.1, math.lerpInvSat(player.speedKmh, 80, 200)) + player.wheelsOutside
   comboMeter = math.max(1, comboMeter - dt * comboFadingRate)
@@ -167,6 +175,8 @@ function script.update(dt)
     end
   end
 end
+
+-- Rest of the script (UI and message handling) remains unchanged
 
 
 -- For various reasons, this is the most questionable part, some UI. I don’t really like
