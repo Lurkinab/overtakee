@@ -36,15 +36,18 @@ local playerPreCollisionSpeed = 0 -- Track player's speed before collision
 local function handleCollision(player, otherCar)
   if collisionCooldown > 0 then return end -- Skip if cooldown is active
 
+  -- Store pre-collision score for highestScore comparison
+  local preCollisionScore = totalScore
   -- Deduct 1000 points per collision
   totalScore = math.max(0, totalScore - 1000)
   comboMeter = 1
   collisionCounter = collisionCounter + 1
 
-  -- Update highestScore immediately upon collision
-  if totalScore > highestScore then
-    highestScore = math.floor(totalScore)
+  -- Update highestScore based on pre-collision score
+  if preCollisionScore > highestScore then
+    highestScore = math.floor(preCollisionScore)
     ac.sendChatMessage("New highest score: " .. highestScore .. " points after collision.")
+    ac.log("Collision detected, updated highestScore to: " .. highestScore)
   end
 
   -- Reset score if collision counter reaches maxCollisions
@@ -69,7 +72,7 @@ local function updateLeaderboard()
   leaderboard = {} -- Reset leaderboard
   for i = 1, ac.getSimState().carsCount do
     local car = ac.getCarState(i)
-    if car.isRealPlayer then -- Only track real players
+    if car.driverName and car.driverName ~= "" then -- Check for real player using driverName
       local playerScore = (i == 1) and totalScore or (leaderboard[car.driverName] or 0)
       -- Ensure unique entry by driverName, update if higher
       local existing = nil
@@ -88,6 +91,7 @@ local function updateLeaderboard()
   end
   -- Sort leaderboard by score (descending)
   table.sort(leaderboard, function(a, b) return a.score > b.score end)
+  ac.log("Leaderboard updated: " .. #leaderboard .. " players")
 end
 
 function script.update(dt)
@@ -176,7 +180,9 @@ function script.update(dt)
         end
       end
 
-      if car.collidedWith == 0 and collisionCooldown <= 0 then
+      -- Check collision for both player and other car
+      if (car.collidedWith == 0 or (i == 1 and ac.getCarState(0).collidedWith == i)) and collisionCooldown <= 0 then
+        ac.log("Collision detected with car index: " .. i .. ", preCollisionScore: " .. totalScore)
         handleCollision(player, car) -- Handle collision
         state.collided = true
       end
