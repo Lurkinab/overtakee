@@ -64,7 +64,8 @@ local function updateLeaderboard()
   for i = 1, ac.getSimState().carsCount do
     local car = ac.getCarState(i)
     if not car.isRemoteDriving and car.isRealPlayer then -- Only track real players
-      leaderboard[#leaderboard + 1] = { name = car.driverName, score = car.score or 0 }
+      local playerScore = (i == 1) and totalScore or (leaderboard[car.driverName] or 0)
+      leaderboard[#leaderboard + 1] = { name = car.driverName, score = playerScore }
     end
   end
   -- Sort leaderboard by score (descending)
