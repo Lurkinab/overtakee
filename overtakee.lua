@@ -12,10 +12,12 @@ local maxComboMultiplier = 10 -- Maximum combo multiplier
 local collisionCounter = 0 -- Tracks the number of collisions
 local maxCollisions = 5 -- Maximum allowed collisions before score reset
 
--- Leaderboard state
-local leaderboard = {} -- Tracks real players and their scores
+-- Leaderboard configuration
+local leaderboard = {} -- Table to store player scores
+local leaderboardUpdateInterval = 5 -- Update interval in seconds
+local leaderboardTimer = 0 -- Timer for leaderboard updates
 
--- This function is called before event activates. Once it returns true, it’ll run:
+-- This function is called before event activates. Once it returns true, it'll run:
 function script.prepare(dt)
   ac.debug('speed', ac.getCarState(1).speedKmh)
   return ac.getCarState(1).speedKmh > 60
@@ -32,30 +34,32 @@ local carsState = {}
 local wheelsWarningTimeout = 0
 local playerPreCollisionSpeed = 0 -- Track player's speed before collision
 
+-- Function to update highest score
+local function updateHighestScore()
+  if totalScore > highestScore then
+    highestScore = math.floor(totalScore)
+    ac.sendChatMessage("Scored " .. totalScore .. " points.")
+    
+    -- Update leaderboard with player's score
+    local playerName = ac.getDriverName(0)
+    leaderboard[playerName] = highestScore
+  end
+end
+
 -- Function to handle collisions
 local function handleCollision(player, otherCar)
   if collisionCooldown > 0 then return end -- Skip if cooldown is active
 
-  -- Store pre-collision score for highestScore comparison
-  local preCollisionScore = totalScore
   -- Deduct 1000 points per collision
   totalScore = math.max(0, totalScore - 1000)
   comboMeter = 1
   collisionCounter = collisionCounter + 1
 
-  -- Update highestScore based on pre-collision score
-  if preCollisionScore > highestScore then
-    highestScore = math.floor(preCollisionScore)
-    ac.sendChatMessage("New highest score: " .. highestScore .. " points after collision.")
-    ac.log("Collision detected, updated highestScore to: " .. highestScore)
-  end
-
   -- Reset score if collision counter reaches maxCollisions
   if collisionCounter >= maxCollisions then
-    if totalScore > highestScore then
-      highestScore = math.floor(totalScore)
-      ac.sendChatMessage("Scored " .. totalScore .. " points before reset due to collisions.")
-    end
+    -- Check and update highest score before resetting
+    updateHighestScore()
+    
     totalScore = 0
     collisionCounter = 0 -- Reset collision counter
     addMessage('Too many collisions! Score reset.', -1)
@@ -67,45 +71,33 @@ local function handleCollision(player, otherCar)
   collisionCooldown = collisionCooldownDuration
 end
 
--- Function to update leaderboard
+-- Function to collect session highest scores
 local function updateLeaderboard()
-  leaderboard = {} -- Reset leaderboard
-  for i = 1, ac.getSimState().carsCount do
-    local car = ac.getCarState(i)
-    local driverName = car:driverName() -- Call driverName as a function
-    if driverName and driverName ~= "" then -- Check for real player
-      local playerScore = (i == 1) and totalScore or (leaderboard[driverName] or 0)
-      -- Ensure unique entry by driverName, update if higher
-      local existing = nil
-      for _, entry in ipairs(leaderboard) do
-        if entry.name == driverName then
-          existing = entry
-          break
-        end
-      end
-      if existing then
-        existing.score = math.max(existing.score, playerScore)
-      else
-        table.insert(leaderboard, { name = driverName, score = playerScore })
+  local simState = ac.getSimState()
+  
+  -- For each real player (not AI traffic)
+  for i = 0, simState.carsCount - 1 do
+    -- Skip if it's an AI car
+    if not ac.isCarAI(i) then
+      local playerName = ac.getDriverName(i)
+      local playerScore = ac.getDriverHighestScore(i) or 0
+      
+      -- Update leaderboard if player has a score
+      if playerScore > 0 then
+        leaderboard[playerName] = playerScore
       end
     end
   end
-  -- Sort leaderboard by score (descending)
-  table.sort(leaderboard, function(a, b) return a.score > b.score end)
-  ac.log("Leaderboard updated: " .. #leaderboard .. " players")
 end
 
 function script.update(dt)
   if timePassed == 0 then
-    addMessage('Let’s go!', 0)
+    addMessage('Let's go!', 0)
   end
 
   local player = ac.getCarState(1)
   if player.engineLifeLeft < 1 then
-    if totalScore > highestScore then
-      highestScore = math.floor(totalScore)
-      ac.sendChatMessage("Scored " .. totalScore .. " points.")
-    end
+    updateHighestScore() -- Update highest score before resetting
     totalScore = 0
     comboMeter = 1
     return
@@ -116,6 +108,13 @@ function script.update(dt)
   -- Update collision cooldown
   if collisionCooldown > 0 then
     collisionCooldown = collisionCooldown - dt
+  end
+
+  -- Update leaderboard periodically
+  leaderboardTimer = leaderboardTimer + dt
+  if leaderboardTimer >= leaderboardUpdateInterval then
+    updateLeaderboard()
+    leaderboardTimer = 0
   end
 
   -- Cap the combo multiplier at maxComboMultiplier
@@ -140,10 +139,7 @@ function script.update(dt)
 
   if player.speedKmh < requiredSpeed then 
     if dangerouslySlowTimer > 10 then    
-      if totalScore > highestScore then
-        highestScore = math.floor(totalScore)
-        ac.sendChatMessage("Scored " .. totalScore .. " points.")
-      end
+      updateHighestScore() -- Update highest score before resetting
       totalScore = 0
       comboMeter = 1
     else
@@ -181,9 +177,7 @@ function script.update(dt)
         end
       end
 
-      -- Check collision for both player and other car
-      if (car.collidedWith == 0 or (i == 1 and ac.getCarState(0).collidedWith == i)) and collisionCooldown <= 0 then
-        ac.log("Collision detected with car index: " .. i .. ", preCollisionScore: " .. totalScore)
+      if car.collidedWith == 0 and collisionCooldown <= 0 then
         handleCollision(player, car) -- Handle collision
         state.collided = true
       end
@@ -198,9 +192,6 @@ function script.update(dt)
           comboColor = comboColor + 90
           addMessage('Overtake', comboMeter > 20 and 1 or 0)
           state.overtaken = true
-          ac.log("Overtake detected, totalScore: " .. totalScore .. ", comboMeter: " .. comboMeter)
-        else
-          ac.log("Overtake check - posDot: " .. posDot .. ", maxPosDot: " .. state.maxPosDot)
         end
       end
 
@@ -212,9 +203,6 @@ function script.update(dt)
       state.nearMiss = false
     end
   end
-
-  -- Update leaderboard
-  updateLeaderboard()
 end
 
 -- UI and message handling
@@ -274,3 +262,81 @@ local function updateMessages(dt)
         life = 0.5 + 0.5 * math.random()
       }
     end
+  end
+end
+
+-- Function to render leaderboard
+local function drawLeaderboard(posX, posY)
+  local sortedPlayers = {}
+  for player, score in pairs(leaderboard) do
+    table.insert(sortedPlayers, {name = player, score = score})
+  end
+  
+  -- Sort players by score (highest first)
+  table.sort(sortedPlayers, function(a, b) return a.score > b.score end)
+  
+  -- Title
+  ui.pushFont(ui.Font.Title)
+  ui.text("Leaderboard")
+  ui.popFont()
+  
+  -- Player scores
+  ui.pushFont(ui.Font.Main)
+  for i, player in ipairs(sortedPlayers) do
+    -- Limit to top 10 players
+    if i <= 10 then
+      ui.text(i .. ". " .. player.name .. ": " .. player.score)
+    end
+  end
+  ui.popFont()
+end
+
+local speedWarning = 0
+function script.drawUI()
+  local uiState = ac.getUiState()
+  updateMessages(uiState.dt)
+
+  local speedRelative = math.saturate(math.floor(ac.getCarState(1).speedKmh) / requiredSpeed)
+  speedWarning = math.applyLag(speedWarning, speedRelative < 1 and 1 or 0, 0.5, uiState.dt)
+
+  local colorDark = rgbm(0.4, 0.4, 0.4, 1)
+  local colorGrey = rgbm(0.7, 0.7, 0.7, 1)
+  local colorAccent = rgbm.new(hsv(speedRelative * 120, 1, 1):rgb(), 1)
+  local colorCombo = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
+
+  -- Draw the score and collision counter
+  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 600, 100), vec2(400, 400))
+  ui.beginOutline()
+
+  ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
+  ui.pushFont(ui.Font.Title)
+  ui.text('Highest Score: ' .. highestScore)
+  ui.popFont()
+  ui.popStyleVar()
+
+  ui.pushFont(ui.Font.Huge)
+  ui.text(totalScore .. ' pts')
+  ui.sameLine(0, 40)
+  ui.beginRotation()
+  ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'x', colorCombo)
+  if comboMeter > 20 then
+    ui.endRotation(math.sin(comboMeter / 180 * 3141.5) * 3 * math.lerpInvSat(comboMeter, 20, 30) + 90)
+  end
+  ui.popFont()
+
+  -- Draw collision counter
+  ui.offsetCursorY(20)
+  ui.pushFont(ui.Font.Main)
+  ui.textColored('Collisions: ' .. collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1))
+  ui.popFont()
+
+  ui.endOutline(rgbm(0, 0, 0, 0.3))
+  ui.endTransparentWindow()
+  
+  -- Draw leaderboard in a separate window
+  ui.beginTransparentWindow('leaderboard', vec2(uiState.windowSize.x - 250, 100), vec2(230, 400))
+  ui.beginOutline()
+  drawLeaderboard(0, 0)
+  ui.endOutline(rgbm(0, 0, 0, 0.3))
+  ui.endTransparentWindow()
+end
