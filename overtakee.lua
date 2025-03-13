@@ -197,16 +197,16 @@ function script.drawUI()
   updateMessages(uiState.dt)
 
   -- UI colors
-  local backgroundColor = rgbm(1, 1, 1, 0.9) -- White background
+  local backgroundColor = rgbm(1, 1, 1, 0.9) -- White background with 90% opacity
   local textColor = rgbm(0, 0, 0, 1) -- Black text
   local comboColorUI = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
   -- Draw the score and collision counter
-  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 600, 100), vec2(400, 400))
+  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 200, 100), vec2(400, 300))
   ui.beginOutline()
 
-  -- Background
-  ui.drawRectFilled(vec2(0, 0), vec2(400, 400), backgroundColor, 1)
+  -- Draw background
+  ui.drawRectFilled(vec2(0, 0), vec2(400, 300), backgroundColor, 1)
 
   -- Score and combo
   ui.pushFont(ui.Font.Huge)
@@ -222,7 +222,7 @@ function script.drawUI()
   -- Collision counter
   ui.offsetCursorY(20)
   ui.pushFont(ui.Font.Main)
-  ui.textColored('Collisions: ' .. collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1))
+  ui.textColored('Collisions: ' .. collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1)) -- Red text for collisions
   ui.popFont()
 
   -- Messages
@@ -234,6 +234,14 @@ function script.drawUI()
     ui.textColored(m.text, m.mood == 1 and rgbm(0, 1, 0, 1) or m.mood == -1 and rgbm(1, 0, 0, 1) or textColor)
   end
   ui.popFont()
+
+  -- Glitter effects
+  for i = 1, glitterCount do
+    local g = glitter[i]
+    if g then
+      ui.drawLine(g.pos, g.pos + g.velocity * 4, g.color, 2)
+    end
+  end
 
   ui.endOutline(rgbm(0, 0, 0, 0.3))
   ui.endTransparentWindow()
