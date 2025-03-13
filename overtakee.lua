@@ -30,6 +30,7 @@ local eventState = {
   glitterCount = 0, -- Number of active glitter particles
   crashCount = 0, -- Track number of crashes
   lastCollisionCarIndex = -1, -- Track the last car involved in a collision
+  collisionProcessed = false, -- Track if the current collision has been processed
 }
 
 -- Function to handle collisions
@@ -66,6 +67,7 @@ local function handleCollision(player, otherCar, carIndex)
   -- Start collision cooldown
   collisionCooldown = collisionCooldownDuration
   eventState.lastCollisionCarIndex = carIndex -- Track the last car involved in a collision
+  eventState.collisionProcessed = true -- Mark the collision as processed
 end
 
 -- Function to add a message to the message queue
@@ -189,7 +191,7 @@ function script.update(dt)
 
     if car.pos:closerToThan(player.pos, 10) then
       -- Check for collisions
-      if car.collidedWith == 0 and collisionCooldown <= 0 then
+      if car.collidedWith == 0 and collisionCooldown <= 0 and not eventState.collisionProcessed then
         handleCollision(player, car, i) -- Pass car index to handleCollision
         state.collided = true
       end
@@ -227,6 +229,11 @@ function script.update(dt)
       state.drivingAlong = true
       state.nearMiss = false
     end
+  end
+
+  -- Reset collision processed flag after cooldown
+  if collisionCooldown <= 0 then
+    eventState.collisionProcessed = false
   end
 end
 
