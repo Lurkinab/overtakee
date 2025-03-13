@@ -1,0 +1,43 @@
+-- Load PNG files from URLs
+local rect12URL = "https://raw.githubusercontent.com/yourusername/yourrepo/main/rect12.png"
+local rect24URL = "https://raw.githubusercontent.com/yourusername/yourrepo/main/rect24.png"
+local rect32URL = "https://raw.githubusercontent.com/yourusername/yourrepo/main/rect32.png"
+
+local rect12 = ac.loadTextureFromURL(rect12URL) -- PTS background
+local rect24 = ac.loadTextureFromURL(rect24URL) -- Combo multiplier background
+local rect32 = ac.loadTextureFromURL(rect32URL) -- Collision tracking background
+
+-- Define positions for the UI elements
+local rect12Pos = vec2(100, 100) -- Position for PTS
+local rect24Pos = vec2(100, 150) -- Position for Combo Multiplier
+local rect32Pos = vec2(100, 200) -- Position for Collision Tracking
+
+-- Define dynamic values (these will be updated during the game)
+local ptsValue = 0
+local comboMultiplier = 1.0
+local collisionCount = 0
+local maxCollisions = 5
+
+-- Function to draw the UI
+function drawUI()
+    -- Draw the background textures
+    ac.drawTexture(rect12, rect12Pos, vec2(rect12:getWidth(), rect12:getHeight()))
+    ac.drawTexture(rect24, rect24Pos, vec2(rect24:getWidth(), rect24:getHeight()))
+    ac.drawTexture(rect32, rect32Pos, vec2(rect32:getWidth(), rect32:getHeight()))
+
+    -- Draw dynamic text on top of the textures
+    ac.drawText(rect12Pos + vec2(10, 10), string.format("PTS: %d", ptsValue), rgb(255, 255, 255)) -- White text for PTS
+    ac.drawText(rect24Pos + vec2(10, 10), string.format("Combo: %.1fX", comboMultiplier), rgb(0, 255, 0)) -- Green text for Combo
+    ac.drawText(rect32Pos + vec2(10, 10), string.format("Collisions: %d/%d", collisionCount, maxCollisions), rgb(255, 0, 0)) -- Red text for Collisions
+end
+
+-- Update function (called every frame)
+function update(dt)
+    -- Example: Update dynamic values (replace with actual game logic)
+    ptsValue = ptsValue + 1 -- Increment PTS (example)
+    comboMultiplier = comboMultiplier + 0.1 -- Increase combo (example)
+    collisionCount = math.min(collisionCount + 1, maxCollisions) -- Increment collisions (example)
+
+    -- Draw the UI
+    drawUI()
+end
