@@ -1,14 +1,3 @@
--- Load PNG files from Imgur URLs
-local rect12URL = "https://i.imgur.com/xtnd7HL.png" -- PTS background
-local rect24URL = "https://i.imgur.com/NH2Lqpr.png" -- Combo multiplier background
-
-local rect12 = ac.loadTextureFromURL(rect12URL) -- PTS background
-local rect24 = ac.loadTextureFromURL(rect24URL) -- Combo multiplier background
-
--- Define positions for the UI elements (same as the old UI positions)
-local rect12Pos = vec2(100, 100) -- Position for PTS (same as old UI)
-local rect24Pos = vec2(100, 150) -- Position for Combo Multiplier (same as old UI)
-
 -- Event configuration:
 local requiredSpeed = 80
 
@@ -22,6 +11,9 @@ local maxComboMultiplier = 10 -- Maximum combo multiplier
 -- Collision counter and score reset logic
 local collisionCounter = 0 -- Tracks the number of collisions
 local maxCollisions = 5 -- Maximum allowed collisions before score reset
+
+-- Load the background image from the Imgur link
+local backgroundImage = ui.loadImage("https://i.imgur.com/PYrcR7h.png")
 
 -- This function is called before event activates. Once it returns true, it’ll run:
 function script.prepare(dt)
@@ -245,15 +237,11 @@ function script.drawUI()
   local uiState = ac.getUiState()
   updateMessages(uiState.dt)
 
-  -- Draw the background textures
-  ac.drawTexture(rect12, rect12Pos, vec2(rect12:getWidth(), rect12:getHeight()))
-  ac.drawTexture(rect24, rect24Pos, vec2(rect24:getWidth(), rect24:getHeight()))
+  -- Draw the background image
+  if backgroundImage ~= nil then
+    ui.drawImage(backgroundImage, vec2(0, 0), uiState.windowSize, rgbm(1, 1, 1, 0.7)) -- Adjust transparency (0.7) as needed
+  end
 
-  -- Draw dynamic text on top of the textures
-  ac.drawText(rect12Pos + vec2(10, 10), string.format("PTS: %d", totalScore), rgb(255, 255, 255)) -- White text for PTS
-  ac.drawText(rect24Pos + vec2(10, 10), string.format("Combo: %.1fX", comboMeter), rgb(0, 255, 0)) -- Green text for Combo
-
-  -- Rest of your existing UI code
   local speedRelative = math.saturate(math.floor(ac.getCarState(1).speedKmh) / requiredSpeed)
   speedWarning = math.applyLag(speedWarning, speedRelative < 1 and 1 or 0, 0.5, uiState.dt)
 
