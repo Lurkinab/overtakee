@@ -163,6 +163,16 @@ function script.drawUI()
   local textColor = rgbm(1, 1, 1, 1) -- White text
   local comboColorUI = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
+-- UI and message handling
+local uiPosition = vec2(uiState.windowSize.x * 0.5 - 250, 100) -- Initial position of the UI
+
+function script.drawUI()
+  local uiState = ac.getUiState()
+
+  -- UI colors
+  local textColor = rgbm(1, 1, 1, 1) -- White text
+  local comboColorUI = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
+
   -- Begin draggable UI window
   ui.beginWindow('overtakeScore', uiPosition, vec2(500, 300), true)
   ui.setWindowDraggable(true) -- Make the window draggable
