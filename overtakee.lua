@@ -20,7 +20,7 @@ local eventState = {
   totalScore = 0,
   comboMeter = 1,
   comboColor = 0,
-  highestScore = 0,
+  highestScore = ac.storage.get("highestScore") or 0, -- Load highest score from storage
   dangerouslySlowTimer = 0,
   carsState = {},
   wheelsWarningTimeout = 0,
@@ -29,17 +29,10 @@ local eventState = {
   glitter = {}, -- Glitter particles
   glitterCount = 0, -- Number of active glitter particles
   crashCount = 0, -- Track number of crashes
-  lastCollisionCarIndex = -1, -- Track the last car involved in a collision
-  collisionProcessed = false, -- Track if the current collision has been processed
 }
 
 -- Function to handle collisions
-local function handleCollision(player, otherCar, carIndex)
-  -- Check if the collision is with the same car and within cooldown
-  if eventState.lastCollisionCarIndex == carIndex and collisionCooldown > 0 then
-    return -- Ignore repeated collisions with the same car during cooldown
-  end
-
+local function handleCollision(player, otherCar)
   local speedLoss = eventState.playerPreCollisionSpeed - player.speedKmh
   ac.debug('Collision detected!', 'Speed loss: ' .. speedLoss)
 
@@ -49,6 +42,7 @@ local function handleCollision(player, otherCar, carIndex)
   -- Update highest score before resetting
   if eventState.totalScore > eventState.highestScore then
     eventState.highestScore = eventState.totalScore
+    ac.storage.set("highestScore", eventState.highestScore) -- Save highest score to storage
     ac.sendChatMessage("New high score: " .. eventState.highestScore)
   end
 
@@ -66,8 +60,6 @@ local function handleCollision(player, otherCar, carIndex)
 
   -- Start collision cooldown
   collisionCooldown = collisionCooldownDuration
-  eventState.lastCollisionCarIndex = carIndex -- Track the last car involved in a collision
-  eventState.collisionProcessed = true -- Mark the collision as processed
 end
 
 -- Function to add a message to the message queue
@@ -140,6 +132,7 @@ function script.update(dt)
   if not player or player.engineLifeLeft < 1 then
     if eventState.totalScore > eventState.highestScore then
       eventState.highestScore = math.floor(eventState.totalScore)
+      ac.storage.set("highestScore", eventState.highestScore) -- Save highest score to storage
       ac.sendChatMessage("Scored " .. eventState.totalScore .. " points.")
     end
     eventState.totalScore = 0
@@ -171,6 +164,7 @@ function script.update(dt)
     if eventState.dangerouslySlowTimer > 10 then
       if eventState.totalScore > eventState.highestScore then
         eventState.highestScore = math.floor(eventState.totalScore)
+        ac.storage.set("highestScore", eventState.highestScore) -- Save highest score to storage
         ac.sendChatMessage("New high score: " .. eventState.highestScore)
       end
       eventState.totalScore = 0
@@ -191,9 +185,10 @@ function script.update(dt)
 
     if car.pos:closerToThan(player.pos, 10) then
       -- Check for collisions
-      if car.collidedWith == 0 and collisionCooldown <= 0 and not eventState.collisionProcessed then
-        handleCollision(player, car, i) -- Pass car index to handleCollision
+      if car.collidedWith == 0 and collisionCooldown <= 0 then
+        handleCollision(player, car)
         state.collided = true
+        collisionCooldown = collisionCooldownDuration
       end
 
       -- Check for near misses
@@ -229,11 +224,6 @@ function script.update(dt)
       state.drivingAlong = true
       state.nearMiss = false
     end
-  end
-
-  -- Reset collision processed flag after cooldown
-  if collisionCooldown <= 0 then
-    eventState.collisionProcessed = false
   end
 end
 
