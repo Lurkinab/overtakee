@@ -28,21 +28,27 @@ local eventState = {
   messages = {}, -- Message queue
   glitter = {}, -- Glitter particles
   glitterCount = 0, -- Number of active glitter particles
+  crashCount = 0, -- Track number of crashes
 }
 
 -- Function to handle collisions
 local function handleCollision(player, otherCar)
   local speedLoss = eventState.playerPreCollisionSpeed - player.speedKmh
+  ac.debug('Collision detected!', 'Speed loss: ' .. speedLoss)
 
-  if speedLoss > 50 then
-    -- Major collision: reset score to 0
+  -- Increment crash count
+  eventState.crashCount = eventState.crashCount + 1
+
+  if eventState.crashCount >= 5 then
+    -- Reset score and crash count after 5 crashes
     eventState.totalScore = 0
+    eventState.crashCount = 0
     eventState.comboMeter = 1
-    addMessage('MAJOR CRASH! Score reset.', -1)
+    addMessage('5 CRASHES! Score reset.', -1)
   else
-    -- Minor collision: deduct 1000 points
+    -- Deduct points for each crash
     eventState.totalScore = math.max(0, eventState.totalScore - 1000)
-    addMessage('Collision! Lost 1000 points.', -1)
+    addMessage('Collision! Lost 1000 points. Crashes: ' .. eventState.crashCount, -1)
   end
 
   -- Start collision cooldown
@@ -123,6 +129,7 @@ function script.update(dt)
     end
     eventState.totalScore = 0
     eventState.comboMeter = 1
+    eventState.crashCount = 0 -- Reset crash count
     return
   end
 
@@ -149,6 +156,7 @@ function script.update(dt)
     if eventState.dangerouslySlowTimer > 10 then
       eventState.totalScore = 0
       eventState.comboMeter = 1
+      eventState.crashCount = 0 -- Reset crash count
       addMessage('Too slow! Score reset.', -1)
       eventState.dangerouslySlowTimer = 0 -- Reset the timer
     end
@@ -163,23 +171,26 @@ function script.update(dt)
     eventState.carsState[i] = state
 
     if car.pos:closerToThan(player.pos, 10) then
-      local drivingAlong = math.dot(car.look, player.look) > 0.2
-      if not drivingAlong then
-        state.drivingAlong = false
-
-        if not state.nearMiss and car.pos:closerToThan(player.pos, 2.5) then -- Adjusted distance for near miss
-          state.nearMiss = true
-          eventState.comboMeter = eventState.comboMeter + 1
-          addMessage('Near miss: bonus combo', 0)
-        end
-      end
-
+      -- Check for collisions
       if car.collidedWith == 0 and collisionCooldown <= 0 then
         handleCollision(player, car)
         state.collided = true
         collisionCooldown = collisionCooldownDuration
       end
 
+      -- Check for near misses
+      local drivingAlong = math.dot(car.look, player.look) > 0.2
+      if not drivingAlong and not state.collided then
+        state.drivingAlong = false
+
+        if not state.nearMiss and car.pos:closerToThan(player.pos, 2.5) then
+          state.nearMiss = true
+          eventState.comboMeter = eventState.comboMeter + 1
+          addMessage('Near miss: bonus combo', 0)
+        end
+      end
+
+      -- Check for overtakes
       if not state.overtaken and not state.collided and state.drivingAlong then
         local posDir = (car.pos - player.pos):normalize()
         local posDot = math.dot(posDir, car.look)
@@ -241,6 +252,7 @@ function script.drawUI()
   ui.sameLine(0, 40)
   ui.beginRotation()
   ui.textColored(math.ceil(eventState.comboMeter * 10) / 10 .. 'x', colorCombo)
+  ui.textColored(' (' .. eventState.crashCount .. '/5)', rgbm(1, 0, 0, 1)) -- Display crash count
   if eventState.comboMeter > 20 then
     ui.endRotation(math.sin(eventState.comboMeter / 180 * 3141.5) * 3 * math.lerpInvSat(eventState.comboMeter, 20, 30) + 90)
   end
