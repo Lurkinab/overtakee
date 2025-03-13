@@ -29,15 +29,27 @@ local eventState = {
   glitter = {}, -- Glitter particles
   glitterCount = 0, -- Number of active glitter particles
   crashCount = 0, -- Track number of crashes
+  lastCollisionCarIndex = -1, -- Track the last car involved in a collision
 }
 
 -- Function to handle collisions
-local function handleCollision(player, otherCar)
+local function handleCollision(player, otherCar, carIndex)
+  -- Check if the collision is with the same car and within cooldown
+  if eventState.lastCollisionCarIndex == carIndex and collisionCooldown > 0 then
+    return -- Ignore repeated collisions with the same car during cooldown
+  end
+
   local speedLoss = eventState.playerPreCollisionSpeed - player.speedKmh
   ac.debug('Collision detected!', 'Speed loss: ' .. speedLoss)
 
   -- Increment crash count
   eventState.crashCount = eventState.crashCount + 1
+
+  -- Update highest score before resetting
+  if eventState.totalScore > eventState.highestScore then
+    eventState.highestScore = eventState.totalScore
+    ac.sendChatMessage("New high score: " .. eventState.highestScore)
+  end
 
   if eventState.crashCount >= 5 then
     -- Reset score and crash count after 5 crashes
@@ -53,6 +65,7 @@ local function handleCollision(player, otherCar)
 
   -- Start collision cooldown
   collisionCooldown = collisionCooldownDuration
+  eventState.lastCollisionCarIndex = carIndex -- Track the last car involved in a collision
 end
 
 -- Function to add a message to the message queue
@@ -154,6 +167,10 @@ function script.update(dt)
   if player.speedKmh < requiredSpeed then
     eventState.dangerouslySlowTimer = eventState.dangerouslySlowTimer + dt
     if eventState.dangerouslySlowTimer > 10 then
+      if eventState.totalScore > eventState.highestScore then
+        eventState.highestScore = math.floor(eventState.totalScore)
+        ac.sendChatMessage("New high score: " .. eventState.highestScore)
+      end
       eventState.totalScore = 0
       eventState.comboMeter = 1
       eventState.crashCount = 0 -- Reset crash count
@@ -173,9 +190,8 @@ function script.update(dt)
     if car.pos:closerToThan(player.pos, 10) then
       -- Check for collisions
       if car.collidedWith == 0 and collisionCooldown <= 0 then
-        handleCollision(player, car)
+        handleCollision(player, car, i) -- Pass car index to handleCollision
         state.collided = true
-        collisionCooldown = collisionCooldownDuration
       end
 
       -- Check for near misses
