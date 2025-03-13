@@ -16,6 +16,24 @@ local highestScore = 0
 local dangerouslySlowTimer = 0
 local carsState = {}
 local wheelsWarningTimeout = 0
+local playerPreCollisionSpeed = 0 -- Track player's speed before collision
+
+-- Function to calculate collision severity based on speed loss
+local function handleCollision(player, otherCar)
+  local speedLoss = playerPreCollisionSpeed - player.speedKmh
+  local severity = math.saturate(speedLoss / 50) -- Normalize severity based on speed loss (50 km/h = max severity)
+
+  -- Deduct points based on severity, capped at 200
+  local pointsLost = math.ceil(200 * severity) -- Maximum of 200 points lost
+  totalScore = math.max(0, totalScore - pointsLost)
+  comboMeter = 1
+
+  if severity > 0.8 then
+    addMessage('Severe collision! Lost ' .. pointsLost .. ' points.', -1)
+  else
+    addMessage('Collision: lost ' .. pointsLost .. ' points.', -1)
+  end
+end
 
 function script.update(dt)
   if timePassed == 0 then
@@ -70,6 +88,9 @@ function script.update(dt)
     dangerouslySlowTimer = 0
   end
 
+  -- Update player's pre-collision speed
+  playerPreCollisionSpeed = player.speedKmh
+
   for i = 1, ac.getSimState().carsCount do 
     local car = ac.getCarState(i)
     local state = carsState[i]
@@ -93,16 +114,8 @@ function script.update(dt)
       end
 
       if car.collidedWith == 0 then
-        addMessage('Collision: -750 points', -1)
+        handleCollision(player, car) -- Handle collision severity
         state.collided = true
-
-        if totalScore > highestScore then
-          highestScore = math.floor(totalScore)
-          ac.sendChatMessage("scored " .. totalScore .. " points.")
-        end
-
-        totalScore = math.max(0, totalScore - 750) -- Deduct 750 points
-        comboMeter = 1
       end
 
       if not state.overtaken and not state.collided and state.drivingAlong then
@@ -127,6 +140,8 @@ function script.update(dt)
     end
   end
 end
+
+-- Rest of the script (UI and message handling) remains unchanged
 
 -- For various reasons, this is the most questionable part, some UI. I don’t really like
 -- this way though. So, yeah, still thinking about the best way to do it.
