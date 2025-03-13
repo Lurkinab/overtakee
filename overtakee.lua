@@ -1,4 +1,3 @@
--- Event configuration:
 local requiredSpeed = 80
 
 -- Collision cooldown state
@@ -8,7 +7,11 @@ local collisionCooldownDuration = 2 -- Cooldown duration in seconds
 -- Combo multiplier cap
 local maxComboMultiplier = 10 -- Maximum combo multiplier
 
--- This function is called before event activates. Once it returns true, it’ll run:
+-- Strike system variables
+local strikes = 0 -- Current number of strikes
+local maxStrikes = 3 -- Maximum number of strikes before wipeout
+
+-- This function is called before event activates. Once it returns true, it'll run:
 function script.prepare(dt)
   ac.debug('speed', ac.getCarState(1).speedKmh)
   return ac.getCarState(1).speedKmh > 60
@@ -25,45 +28,41 @@ local carsState = {}
 local wheelsWarningTimeout = 0
 local playerPreCollisionSpeed = 0 -- Track player's speed before collision
 
--- Function to calculate collision severity based on speed loss
+-- Function to handle the 3-strike collision system
 local function handleCollision(player, otherCar)
-  local speedLoss = playerPreCollisionSpeed - player.speedKmh
-  local severity = math.saturate(speedLoss / 200) -- Normalize severity based on speed loss (200 km/h = max severity)
-
-  -- Deduct points based on severity
-  if severity > 0.9 then
-    -- Severe collision: reset score to 0
+  strikes = strikes + 1
+  
+  if strikes == 1 then
+    -- First collision: lose 750 points
+    totalScore = math.max(0, totalScore - 750)
+    comboMeter = 1
+    addMessage('Strike 1: lost 750 points.', -1)
+  elseif strikes == 2 then
+    -- Second collision: lose 2000 points
+    totalScore = math.max(0, totalScore - 2000)
+    comboMeter = 1
+    addMessage('Strike 2: lost 2000 points.', -1)
+  elseif strikes == 3 then
+    -- Third collision: lose 5000 points
+    totalScore = math.max(0, totalScore - 5000)
+    comboMeter = 1
+    addMessage('Strike 3: lost 5000 points.', -1)
+  else
+    -- Fourth collision: complete wipeout
     if totalScore > highestScore then
       highestScore = math.floor(totalScore)
-      ac.sendChatMessage("Scored " .. totalScore .. " points before crash.")
+      ac.sendChatMessage("Scored " .. totalScore .. " points before wipeout.")
     end
     totalScore = 0
     comboMeter = 1
-    addMessage('Total wipeout! Score reset.', -1)
-  else
-    -- Dynamic point deduction based on severity
-    local pointsLost = 0
-    if speedLoss >= 150 then
-      pointsLost = math.random(2000, 4000) -- Deduct 2000-4000 points for 150+ km/h speed loss
-    elseif speedLoss >= 100 then
-      pointsLost = math.random(1000, 2000) -- Deduct 1000-2000 points for 100-150 km/h speed loss
-    elseif speedLoss >= 50 then
-      pointsLost = math.random(500, 1000) -- Deduct 500-1000 points for 50-100 km/h speed loss
-    elseif speedLoss >= 20 then
-      pointsLost = math.random(200, 400) -- Deduct 200-400 points for 20-50 km/h speed loss
-    else
-      pointsLost = math.random(50, 150) -- Deduct 50-150 points for <20 km/h speed loss
-    end
-
-    totalScore = math.max(0, totalScore - pointsLost)
-    comboMeter = 1
-    addMessage('Collision: lost ' .. pointsLost .. ' points.', -1)
+    strikes = 0 -- Reset strikes after wipeout
+    addMessage('Strike 4: Complete wipeout! Score reset.', -1)
   end
 end
 
 function script.update(dt)
   if timePassed == 0 then
-    addMessage('Let’s go!', 0)
+    addMessage('Let's go!', 0)
   end
 
   local player = ac.getCarState(1)
@@ -74,6 +73,7 @@ function script.update(dt)
     end
     totalScore = 0
     comboMeter = 1
+    strikes = 0 -- Reset strikes when engine dies
     return
   end
 
@@ -112,6 +112,7 @@ function script.update(dt)
       end
       totalScore = 0
       comboMeter = 1
+      strikes = 0 -- Reset strikes when too slow for too long
     else
       if dangerouslySlowTimer == 0 then addMessage('Too slow!', -1) end
     end
@@ -148,7 +149,7 @@ function script.update(dt)
       end
 
       if car.collidedWith == 0 and collisionCooldown <= 0 then
-        handleCollision(player, car) -- Handle collision severity
+        handleCollision(player, car) -- Handle collision with strike system
         state.collided = true
         collisionCooldown = collisionCooldownDuration -- Start cooldown
       end
@@ -178,8 +179,7 @@ end
 
 -- Rest of the script (UI and message handling) remains unchanged
 
-
--- For various reasons, this is the most questionable part, some UI. I don’t really like
+-- For various reasons, this is the most questionable part, some UI. I don't really like
 -- this way though. So, yeah, still thinking about the best way to do it.
 local messages = {}
 local glitter = {}
@@ -282,6 +282,17 @@ function script.drawUI()
     ui.endRotation(math.sin(comboMeter / 180 * 3141.5) * 3 * math.lerpInvSat(comboMeter, 20, 30) + 90)
   end
   ui.popFont()
+  
+  -- Display current strikes
+  ui.offsetCursorY(5)
+  ui.pushFont(ui.Font.Main)
+  local strikeColor = strikes == 0 and rgbm(0.2, 1, 0.2, 1) or 
+                     strikes == 1 and rgbm(1, 0.8, 0.2, 1) or
+                     strikes == 2 and rgbm(1, 0.5, 0.2, 1) or
+                     rgbm(1, 0.2, 0.2, 1)
+  ui.textColored('Strikes: ' .. strikes .. '/' .. maxStrikes, strikeColor)
+  ui.popFont()
+  
   ui.endOutline(rgbm(0, 0, 0, 0.3))
   
   ui.offsetCursorY(20)
