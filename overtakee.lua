@@ -72,12 +72,13 @@ local function updateLeaderboard()
   leaderboard = {} -- Reset leaderboard
   for i = 1, ac.getSimState().carsCount do
     local car = ac.getCarState(i)
-    if car.driverName and car.driverName ~= "" then -- Check for real player using driverName
-      local playerScore = (i == 1) and totalScore or (leaderboard[car.driverName] or 0)
+    local driverName = car:driverName() -- Call driverName as a function
+    if driverName and driverName ~= "" then -- Check for real player
+      local playerScore = (i == 1) and totalScore or (leaderboard[driverName] or 0)
       -- Ensure unique entry by driverName, update if higher
       local existing = nil
       for _, entry in ipairs(leaderboard) do
-        if entry.name == car.driverName then
+        if entry.name == driverName then
           existing = entry
           break
         end
@@ -85,7 +86,7 @@ local function updateLeaderboard()
       if existing then
         existing.score = math.max(existing.score, playerScore)
       else
-        table.insert(leaderboard, { name = car.driverName, score = playerScore })
+        table.insert(leaderboard, { name = driverName, score = playerScore })
       end
     end
   end
@@ -197,6 +198,9 @@ function script.update(dt)
           comboColor = comboColor + 90
           addMessage('Overtake', comboMeter > 20 and 1 or 0)
           state.overtaken = true
+          ac.log("Overtake detected, totalScore: " .. totalScore .. ", comboMeter: " .. comboMeter)
+        else
+          ac.log("Overtake check - posDot: " .. posDot .. ", maxPosDot: " .. state.maxPosDot)
         end
       end
 
@@ -270,60 +274,3 @@ local function updateMessages(dt)
         life = 0.5 + 0.5 * math.random()
       }
     end
-  end
-end
-
-local speedWarning = 0
-function script.drawUI()
-  local uiState = ac.getUiState()
-  updateMessages(uiState.dt)
-
-  local speedRelative = math.saturate(math.floor(ac.getCarState(1).speedKmh) / requiredSpeed)
-  speedWarning = math.applyLag(speedWarning, speedRelative < 1 and 1 or 0, 0.5, uiState.dt)
-
-  local colorDark = rgbm(0.4, 0.4, 0.4, 1)
-  local colorGrey = rgbm(0.7, 0.7, 0.7, 1)
-  local colorAccent = rgbm.new(hsv(speedRelative * 120, 1, 1):rgb(), 1)
-  local colorCombo = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
-
-  -- Draw the score and collision counter
-  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 600, 100), vec2(400, 400))
-  ui.beginOutline()
-
-  ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
-  ui.pushFont(ui.Font.Title)
-  ui.text('Highest Score: ' .. highestScore)
-  ui.popFont()
-  ui.popStyleVar()
-
-  ui.pushFont(ui.Font.Huge)
-  ui.text(totalScore .. ' pts')
-  ui.sameLine(0, 40)
-  ui.beginRotation()
-  ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'x', colorCombo)
-  if comboMeter > 20 then
-    ui.endRotation(math.sin(comboMeter / 180 * 3141.5) * 3 * math.lerpInvSat(comboMeter, 20, 30) + 90)
-  end
-  ui.popFont()
-
-  -- Draw collision counter (bigger font)
-  ui.offsetCursorY(20)
-  ui.pushFont(ui.Font.Title) -- Use a larger font
-  ui.textColored('Collisions: ' .. collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1))
-  ui.popFont()
-
-  ui.endOutline(rgbm(0, 0, 0, 0.3))
-  ui.endTransparentWindow()
-
-  -- Draw leaderboard
-  ui.beginTransparentWindow('leaderboard', vec2(uiState.windowSize.x * 0.5 + 200, 100), vec2(300, 200))
-  ui.beginOutline()
-  ui.pushFont(ui.Font.Title)
-  ui.text('Leaderboard')
-  ui.popFont()
-  for i = 1, #leaderboard do
-    ui.text(leaderboard[i].name .. ': ' .. leaderboard[i].score .. ' pts')
-  end
-  ui.endOutline(rgbm(0, 0, 0, 0.3))
-  ui.endTransparentWindow()
-end
