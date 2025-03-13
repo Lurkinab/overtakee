@@ -157,14 +157,38 @@ function script.drawUI()
   local textColor = rgbm(1, 1, 1, 1) -- White text
   local comboColorUI = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
-  -- Draw the score and new collision counter at the bottom right
+  -- Leaderboard Box for other players' PBs (added box to the left)
+  ui.beginTransparentWindow('leaderboardBox', vec2(uiState.windowSize.x * 0.5 - 600, 100), vec2(300, 200))
+  ui.beginOutline()
+  
+  -- Draw background for leaderboard
+  ui.drawRectFilled(vec2(0, 0), vec2(300, 200), backgroundColor, 1)
+  
+  -- Leaderboard header
+  ui.pushFont(ui.Font.Main)
+  ui.setCursor(vec2(10, 10))
+  ui.textColored("Leaderboards:", textColor)
+  ui.popFont()
+
+  -- List other players’ PBs (top down)
+  for i = 1, sim.carsCount do
+    local car = ac.getCarState(i)
+    local playerName = ac.getDriverName(i)
+    local playerPB = carsState[i] and carsState[i].highestScore or 0
+    ui.textColored(playerName .. ": " .. playerPB .. " PTS", textColor)
+  end
+
+  ui.endOutline(rgbm(0, 0, 0, 0.3))
+  ui.endTransparentWindow()
+
+  -- Score and collision counter box
   ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 200, 100), vec2(400, 100))
   ui.beginOutline()
 
-  -- Background
+  -- Draw background for score
   ui.drawRectFilled(vec2(0, 0), vec2(400, 100), backgroundColor, 1)
 
-  -- Multipliers and layout to resemble the reference
+  -- Multipliers and layout
   ui.pushFont(ui.Font.Main)
   ui.setCursor(vec2(10, 10))
   ui.textColored('1.0X Speed', textColor)
@@ -174,32 +198,20 @@ function script.drawUI()
   ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'X Combo', comboColorUI)
   ui.popFont()
 
-  -- Score box with collision counter on the right where the time was
+  -- Score box with collision counter
   ui.offsetCursorY(30)
   ui.pushFont(ui.Font.Huge)
-  ui.textColored(totalScore .. ' PTS', textColor)
-  ui.sameLine(0, 20) -- Space between score and collision counter
-  ui.pushFont(ui.Font.Main)
-  ui.textColored(collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1)) -- Red collision text where "00:00" was
+  ui.textColored(totalScore .. ' PTS', textColor) -- Make the text smaller for better fitting
+  ui.sameLine(0, 40) -- Increase spacing between PTS and collision counter
+  ui.pushFont(ui.Font.Huge)
+  ui.textColored(collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1)) -- Bigger collision counter with better spacing
   ui.popFont()
   ui.popFont()
 
-  -- Draw highest score (PB) on the left (match layout)
-  ui.offsetCursorY(-70) -- Align with the PB layout from the reference
+  -- PB (Personal Best) aligned below the score
+  ui.offsetCursorY(10)
   ui.pushFont(ui.Font.Main)
   ui.textColored('PB: ' .. highestScore, textColor)
-  ui.popFont()
-
-  -- Leaderboard below the score
-  ui.offsetCursorY(30)
-  ui.pushFont(ui.Font.Main)
-  ui.textColored('Leaderboards:', textColor)
-  for i = 1, sim.carsCount do
-    local car = ac.getCarState(i)
-    local playerName = ac.getDriverName(i)
-    local playerPB = carsState[i] and carsState[i].highestScore or 0
-    ui.textColored(playerName .. ": " .. playerPB .. " PTS", textColor)
-  end
   ui.popFont()
 
   ui.endOutline(rgbm(0, 0, 0, 0.3))
