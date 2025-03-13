@@ -1,4 +1,4 @@
--- Event configuration
+-- Event configuration:
 local requiredSpeed = 80
 
 -- Collision cooldown state
@@ -8,135 +8,70 @@ local collisionCooldownDuration = 2 -- Cooldown duration in seconds
 -- Combo multiplier cap
 local maxComboMultiplier = 10 -- Maximum combo multiplier
 
--- This function is called before the event activates. Once it returns true, it'll run:
+-- Collision counter and score reset logic
+local collisionCounter = 0 -- Tracks the number of collisions
+local maxCollisions = 5 -- Maximum allowed collisions before score reset
+
+-- This function is called before event activates. Once it returns true, it’ll run:
 function script.prepare(dt)
   ac.debug('speed', ac.getCarState(1).speedKmh)
   return ac.getCarState(1).speedKmh > 60
 end
 
 -- Event state:
-local eventState = {
-  timePassed = 0,
-  totalScore = 0,
-  comboMeter = 1,
-  comboColor = 0,
-  highestScore = 0, -- Highest score for the current session
-  dangerouslySlowTimer = 0,
-  carsState = {},
-  wheelsWarningTimeout = 0,
-  playerPreCollisionSpeed = 0, -- Track player's speed before collision
-  messages = {}, -- Message queue
-  glitter = {}, -- Glitter particles
-  glitterCount = 0, -- Number of active glitter particles
-  crashCount = 0, -- Track number of crashes
-}
+local timePassed = 0
+local totalScore = 0
+local comboMeter = 1
+local comboColor = 0
+local highestScore = 0
+local dangerouslySlowTimer = 0
+local carsState = {}
+local wheelsWarningTimeout = 0
+local playerPreCollisionSpeed = 0 -- Track player's speed before collision
 
 -- Function to handle collisions
 local function handleCollision(player, otherCar)
-  -- Increment crash count
-  eventState.crashCount = eventState.crashCount + 1
+  if collisionCooldown > 0 then return end -- Skip if cooldown is active
 
-  -- Update highest score before resetting
-  if eventState.totalScore > eventState.highestScore then
-    eventState.highestScore = eventState.totalScore
-    ac.sendChatMessage("New high score: " .. eventState.highestScore)
-  end
+  -- Deduct 1000 points per collision
+  totalScore = math.max(0, totalScore - 1000)
+  comboMeter = 1
+  collisionCounter = collisionCounter + 1
 
-  if eventState.crashCount >= 5 then
-    -- Reset score and crash count after 5 crashes
-    eventState.totalScore = 0
-    eventState.crashCount = 0
-    eventState.comboMeter = 1
-    addMessage('5 CRASHES! Score reset.', -1)
+  -- Reset score if collision counter reaches maxCollisions
+  if collisionCounter >= maxCollisions then
+    if totalScore > highestScore then
+      highestScore = math.floor(totalScore)
+      ac.sendChatMessage("Scored " .. totalScore .. " points before reset due to collisions.")
+    end
+    totalScore = 0
+    collisionCounter = 0 -- Reset collision counter
+    addMessage('Too many collisions! Score reset.', -1)
   else
-    -- Deduct points for each crash
-    eventState.totalScore = math.max(0, eventState.totalScore - 1000)
-    addMessage('Collision! Lost 1000 points. Crashes: ' .. eventState.crashCount, -1)
+    addMessage('Collision: Lost 1000 points. Collisions: ' .. collisionCounter .. '/' .. maxCollisions, -1)
   end
 
-  -- Start collision cooldown
+  -- Start cooldown
   collisionCooldown = collisionCooldownDuration
 end
 
--- Function to add a message to the message queue
-local function addMessage(text, mood)
-  for i = math.min(#eventState.messages + 1, 4), 2, -1 do
-    eventState.messages[i] = eventState.messages[i - 1]
-    eventState.messages[i].targetPos = i
-  end
-  eventState.messages[1] = { text = text, age = 0, targetPos = 1, currentPos = 1, mood = mood }
-
-  if mood == 1 then
-    for i = 1, 60 do
-      local dir = vec2(math.random() - 0.5, math.random() - 0.5)
-      eventState.glitterCount = eventState.glitterCount + 1
-      eventState.glitter[eventState.glitterCount] = {
-        color = rgbm.new(hsv(math.random() * 360, 1, 1):rgb(), 1),
-        pos = vec2(80, 140) + dir * vec2(40, 20),
-        velocity = dir:normalize():scale(0.2 + math.random()),
-        life = 0.5 + 0.5 * math.random()
-      }
-    end
-  end
-end
-
--- Function to update messages and glitter particles
-local function updateMessages(dt)
-  eventState.comboColor = eventState.comboColor + dt * 10 * eventState.comboMeter
-  if eventState.comboColor > 360 then eventState.comboColor = eventState.comboColor - 360 end
-
-  for i = 1, #eventState.messages do
-    local m = eventState.messages[i]
-    m.age = m.age + dt
-    m.currentPos = math.applyLag(m.currentPos, m.targetPos, 0.8, dt)
-  end
-
-  for i = eventState.glitterCount, 1, -1 do
-    local g = eventState.glitter[i]
-    g.pos:add(g.velocity)
-    g.velocity.y = g.velocity.y + 0.02
-    g.life = g.life - dt
-    g.color.mult = math.saturate(g.life * 4)
-    if g.life < 0 then
-      if i < eventState.glitterCount then
-        eventState.glitter[i] = eventState.glitter[eventState.glitterCount]
-      end
-      eventState.glitterCount = eventState.glitterCount - 1
-    end
-  end
-
-  if eventState.comboMeter > 10 and math.random() > 0.98 then
-    for i = 1, math.floor(eventState.comboMeter) do
-      local dir = vec2(math.random() - 0.5, math.random() - 0.5)
-      eventState.glitterCount = eventState.glitterCount + 1
-      eventState.glitter[eventState.glitterCount] = {
-        color = rgbm.new(hsv(math.random() * 360, 1, 1):rgb(), 1),
-        pos = vec2(195, 75) + dir * vec2(40, 20),
-        velocity = dir:normalize():scale(0.2 + math.random()),
-        life = 0.5 + 0.5 * math.random()
-      }
-    end
-  end
-end
-
 function script.update(dt)
-  if eventState.timePassed == 0 then
-    addMessage("Let's go!", 0)
+  if timePassed == 0 then
+    addMessage('Let’s go!', 0)
   end
 
   local player = ac.getCarState(1)
-  if not player or player.engineLifeLeft < 1 then
-    if eventState.totalScore > eventState.highestScore then
-      eventState.highestScore = math.floor(eventState.totalScore)
-      ac.sendChatMessage("Scored " .. eventState.totalScore .. " points.")
+  if player.engineLifeLeft < 1 then
+    if totalScore > highestScore then
+      highestScore = math.floor(totalScore)
+      ac.sendChatMessage("Scored " .. totalScore .. " points.")
     end
-    eventState.totalScore = 0
-    eventState.comboMeter = 1
-    eventState.crashCount = 0 -- Reset crash count
+    totalScore = 0
+    comboMeter = 1
     return
   end
 
-  eventState.timePassed = eventState.timePassed + dt
+  timePassed = timePassed + dt
 
   -- Update collision cooldown
   if collisionCooldown > 0 then
@@ -144,69 +79,82 @@ function script.update(dt)
   end
 
   -- Cap the combo multiplier at maxComboMultiplier
-  eventState.comboMeter = math.min(eventState.comboMeter, maxComboMultiplier)
+  comboMeter = math.min(comboMeter, maxComboMultiplier)
 
-  -- Update combo meter decay
-  local comboFadingRate = 0.5 * math.lerp(1, 0.1, math.lerpInvSat(player.speedKmh, 80, 200))
-  eventState.comboMeter = math.max(1, eventState.comboMeter - dt * comboFadingRate)
+  local comboFadingRate = 0.5 * math.lerp(1, 0.1, math.lerpInvSat(player.speedKmh, 80, 200)) + player.wheelsOutside
+  comboMeter = math.max(1, comboMeter - dt * comboFadingRate)
 
-  -- Update player's pre-collision speed
-  eventState.playerPreCollisionSpeed = player.speedKmh
-
-  -- Handle dangerously slow speed
-  if player.speedKmh < requiredSpeed then
-    eventState.dangerouslySlowTimer = eventState.dangerouslySlowTimer + dt
-    if eventState.dangerouslySlowTimer > 10 then
-      if eventState.totalScore > eventState.highestScore then
-        eventState.highestScore = math.floor(eventState.totalScore)
-        ac.sendChatMessage("New high score: " .. eventState.highestScore)
-      end
-      eventState.totalScore = 0
-      eventState.comboMeter = 1
-      eventState.crashCount = 0 -- Reset crash count
-      addMessage('Too slow! Score reset.', -1)
-      eventState.dangerouslySlowTimer = 0 -- Reset the timer
-    end
-  else
-    eventState.dangerouslySlowTimer = 0 -- Reset the timer if speed is above required
+  local sim = ac.getSimState()
+  while sim.carsCount > #carsState do
+    carsState[#carsState + 1] = {}
   end
 
-  -- Handle collisions, near misses, and overtakes
-  for i = 1, ac.getSimState().carsCount do
+  if wheelsWarningTimeout > 0 then
+    wheelsWarningTimeout = wheelsWarningTimeout - dt
+  elseif player.wheelsOutside > 0 then
+    if wheelsWarningTimeout == 0 then
+    end
+    addMessage('Car is outside', -1)
+    wheelsWarningTimeout = 60
+  end
+
+  if player.speedKmh < requiredSpeed then 
+    if dangerouslySlowTimer > 10 then    
+      if totalScore > highestScore then
+        highestScore = math.floor(totalScore)
+        ac.sendChatMessage("Scored " .. totalScore .. " points.")
+      end
+      totalScore = 0
+      comboMeter = 1
+    else
+      if dangerouslySlowTimer == 0 then addMessage('Too slow!', -1) end
+    end
+    dangerouslySlowTimer = dangerouslySlowTimer + dt
+    comboMeter = 1
+    return
+  else 
+    dangerouslySlowTimer = 0
+  end
+
+  -- Update player's pre-collision speed
+  playerPreCollisionSpeed = player.speedKmh
+
+  for i = 1, ac.getSimState().carsCount do 
     local car = ac.getCarState(i)
-    local state = eventState.carsState[i] or {}
-    eventState.carsState[i] = state
+    local state = carsState[i]
 
     if car.pos:closerToThan(player.pos, 10) then
-      -- Check for collisions
-      if car.collidedWith == 0 and collisionCooldown <= 0 and not state.collided then
-        handleCollision(player, car)
-        state.collided = true
-        collisionCooldown = collisionCooldownDuration
-      end
-
-      -- Check for near misses
       local drivingAlong = math.dot(car.look, player.look) > 0.2
-      if not drivingAlong and not state.collided then
+      if not drivingAlong then
         state.drivingAlong = false
 
-        if not state.nearMiss and car.pos:closerToThan(player.pos, 2.5) then
+        if not state.nearMiss and car.pos:closerToThan(player.pos, 3) then
           state.nearMiss = true
-          eventState.comboMeter = eventState.comboMeter + 1
-          addMessage('Near miss: bonus combo', 0)
+
+          if car.pos:closerToThan(player.pos, 2.5) then
+            comboMeter = comboMeter + 3
+            addMessage('Very close near miss!', 1)
+          else
+            comboMeter = comboMeter + 1
+            addMessage('Near miss: bonus combo', 0)
+          end
         end
       end
 
-      -- Check for overtakes
+      if car.collidedWith == 0 and collisionCooldown <= 0 then
+        handleCollision(player, car) -- Handle collision
+        state.collided = true
+      end
+
       if not state.overtaken and not state.collided and state.drivingAlong then
         local posDir = (car.pos - player.pos):normalize()
         local posDot = math.dot(posDir, car.look)
         state.maxPosDot = math.max(state.maxPosDot, posDot)
         if posDot < -0.5 and state.maxPosDot > 0.5 then
-          eventState.totalScore = eventState.totalScore + math.ceil(10 * eventState.comboMeter)
-          eventState.comboMeter = eventState.comboMeter + 1
-          eventState.comboColor = eventState.comboColor + 90
-          addMessage('Overtake', eventState.comboMeter > 20 and 1 or 0)
+          totalScore = totalScore + math.ceil(10 * comboMeter)
+          comboMeter = comboMeter + 1
+          comboColor = comboColor + 90
+          addMessage('Overtake', comboMeter > 20 and 1 or 0)
           state.overtaken = true
         end
       end
@@ -222,75 +170,104 @@ function script.update(dt)
 end
 
 -- UI and message handling
+local messages = {}
+local glitter = {}
+local glitterCount = 0
+
+function addMessage(text, mood)
+  for i = math.min(#messages + 1, 4), 2, -1 do
+    messages[i] = messages[i - 1]
+    messages[i].targetPos = i
+  end
+  messages[1] = { text = text, age = 0, targetPos = 1, currentPos = 1, mood = mood }
+  if mood == 1 then
+    for i = 1, 60 do
+      local dir = vec2(math.random() - 0.5, math.random() - 0.5)
+      glitterCount = glitterCount + 1
+      glitter[glitterCount] = { 
+        color = rgbm.new(hsv(math.random() * 360, 1, 1):rgb(), 1), 
+        pos = vec2(80, 140) + dir * vec2(40, 20),
+        velocity = dir:normalize():scale(0.2 + math.random()),
+        life = 0.5 + 0.5 * math.random()
+      }
+    end
+  end
+end
+
+local function updateMessages(dt)
+  comboColor = comboColor + dt * 10 * comboMeter
+  if comboColor > 360 then comboColor = comboColor - 360 end
+  for i = 1, #messages do
+    local m = messages[i]
+    m.age = m.age + dt
+    m.currentPos = math.applyLag(m.currentPos, m.targetPos, 0.8, dt)
+  end
+  for i = glitterCount, 1, -1 do
+    local g = glitter[i]
+    g.pos:add(g.velocity)
+    g.velocity.y = g.velocity.y + 0.02
+    g.life = g.life - dt
+    g.color.mult = math.saturate(g.life * 4)
+    if g.life < 0 then
+      if i < glitterCount then
+        glitter[i] = glitter[glitterCount]
+      end
+      glitterCount = glitterCount - 1
+    end
+  end
+  if comboMeter > 10 and math.random() > 0.98 then
+    for i = 1, math.floor(comboMeter) do
+      local dir = vec2(math.random() - 0.5, math.random() - 0.5)
+      glitterCount = glitterCount + 1
+      glitter[glitterCount] = { 
+        color = rgbm.new(hsv(math.random() * 360, 1, 1):rgb(), 1), 
+        pos = vec2(195, 75) + dir * vec2(40, 20),
+        velocity = dir:normalize():scale(0.2 + math.random()),
+        life = 0.5 + 0.5 * math.random()
+      }
+    end
+  end
+end
+
+local speedWarning = 0
 function script.drawUI()
   local uiState = ac.getUiState()
   updateMessages(uiState.dt)
 
   local speedRelative = math.saturate(math.floor(ac.getCarState(1).speedKmh) / requiredSpeed)
-  local speedWarning = math.applyLag(0, speedRelative < 1 and 1 or 0, 0.5, uiState.dt)
+  speedWarning = math.applyLag(speedWarning, speedRelative < 1 and 1 or 0, 0.5, uiState.dt)
 
   local colorDark = rgbm(0.4, 0.4, 0.4, 1)
   local colorGrey = rgbm(0.7, 0.7, 0.7, 1)
   local colorAccent = rgbm.new(hsv(speedRelative * 120, 1, 1):rgb(), 1)
-  local colorCombo = rgbm.new(hsv(eventState.comboColor, math.saturate(eventState.comboMeter / 10), 1):rgb(), math.saturate(eventState.comboMeter / 4))
+  local colorCombo = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
-  local function speedMeter(ref)
-    ui.drawRectFilled(ref + vec2(0, -4), ref + vec2(180, 5), colorDark, 1)
-    ui.drawLine(ref + vec2(0, -4), ref + vec2(0, 4), colorGrey, 1)
-    ui.drawLine(ref + vec2(requiredSpeed, -4), ref + vec2(requiredSpeed, 4), colorGrey, 1)
-
-    local speed = math.min(ac.getCarState(1).speedKmh, 180)
-    if speed > 1 then
-      ui.drawLine(ref + vec2(0, 0), ref + vec2(speed, 0), colorAccent, 4)
-    end
-  end
-
+  -- Draw the score and collision counter
   ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 600, 100), vec2(400, 400))
   ui.beginOutline()
 
   ui.pushStyleVar(ui.StyleVar.Alpha, 1 - speedWarning)
   ui.pushFont(ui.Font.Title)
-  ui.text('Highest Score: ' .. eventState.highestScore)
+  ui.text('Highest Score: ' .. highestScore)
   ui.popFont()
   ui.popStyleVar()
 
   ui.pushFont(ui.Font.Huge)
-  ui.text(eventState.totalScore .. ' pts')
+  ui.text(totalScore .. ' pts')
   ui.sameLine(0, 40)
   ui.beginRotation()
-  ui.textColored(math.ceil(eventState.comboMeter * 10) / 10 .. 'x', colorCombo)
-  ui.textColored(' (' .. eventState.crashCount .. '/5)', rgbm(1, 0, 0, 1)) -- Display crash count
-  if eventState.comboMeter > 20 then
-    ui.endRotation(math.sin(eventState.comboMeter / 180 * 3141.5) * 3 * math.lerpInvSat(eventState.comboMeter, 20, 30) + 90)
+  ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'x', colorCombo)
+  if comboMeter > 20 then
+    ui.endRotation(math.sin(comboMeter / 180 * 3141.5) * 3 * math.lerpInvSat(comboMeter, 20, 30) + 90)
   end
   ui.popFont()
-  ui.endOutline(rgbm(0, 0, 0, 0.3))
 
+  -- Draw collision counter
   ui.offsetCursorY(20)
-  ui.pushFont(ui.Font.Title)
-  local startPos = ui.getCursor()
-  for i = 1, #eventState.messages do
-    local m = eventState.messages[i]
-    local f = math.saturate(4 - m.currentPos) * math.saturate(8 - m.age)
-    ui.setCursor(startPos + vec2(20 + math.saturate(1 - m.age * 10) ^ 2 * 100, (m.currentPos - 1) * 30))
-    ui.textColored(m.text, m.mood == 1 and rgbm(0, 1, 0, f) or m.mood == -1 and rgbm(1, 0, 0, f) or rgbm(1, 1, 1, f))
-  end
-  for i = 1, eventState.glitterCount do
-    local g = eventState.glitter[i]
-    if g ~= nil then
-      ui.drawLine(g.pos, g.pos + g.velocity * 4, g.color, 2)
-    end
-  end
-  ui.popFont()
-  ui.setCursor(startPos + vec2(0, 4 * 30))
-
-  ui.pushStyleVar(ui.StyleVar.Alpha, speedWarning)
-  ui.setCursorY(0)
   ui.pushFont(ui.Font.Main)
-  ui.textColored('Keep speed above ' .. requiredSpeed .. ' km/h:', colorAccent)
-  speedMeter(ui.getCursor() + vec2(-9, 4))
+  ui.textColored('Collisions: ' .. collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1))
   ui.popFont()
-  ui.popStyleVar()
 
+  ui.endOutline(rgbm(0, 0, 0, 0.3))
   ui.endTransparentWindow()
 end
