@@ -163,14 +163,9 @@ function script.drawUI()
   local textColor = rgbm(1, 1, 1, 1) -- White text
   local comboColorUI = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
-  -- Make the UI movable
-  ui.beginTransparentWindow('overtakeScore', uiPosition, vec2(500, 300), true)
-  ui.beginOutline()
-
-  -- Check if the UI is being dragged
-  if ui.isMouseDragging() and ui.isMouseHoveringWindow() then
-    uiPosition = uiPosition + ui.getMouseDragDelta()
-  end
+  -- Begin draggable UI window
+  ui.beginWindow('overtakeScore', uiPosition, vec2(500, 300), true)
+  ui.setWindowDraggable(true) -- Make the window draggable
 
   -- Multipliers side by side
   ui.pushFont(ui.Font.Main)
@@ -209,6 +204,6 @@ function script.drawUI()
   end
   ui.popFont()
 
-  ui.endOutline(rgbm(0, 0, 0, 0.3))
-  ui.endTransparentWindow()
+  -- End draggable UI window
+  ui.endWindow()
 end
