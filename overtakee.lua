@@ -1,5 +1,9 @@
 -- Event configuration:
-local requiredSpeed = 80
+local requiredSpeed = 50
+
+-- Collision cooldown state
+local collisionCooldown = 0 -- Cooldown timer
+local collisionCooldownDuration = 2 -- Cooldown duration in seconds
 
 -- This function is called before event activates. Once it returns true, it’ll run:
 function script.prepare(dt)
@@ -52,6 +56,11 @@ function script.update(dt)
   end
 
   timePassed = timePassed + dt
+
+  -- Update collision cooldown
+  if collisionCooldown > 0 then
+    collisionCooldown = collisionCooldown - dt
+  end
 
   local comboFadingRate = 0.5 * math.lerp(1, 0.1, math.lerpInvSat(player.speedKmh, 80, 200)) + player.wheelsOutside
   comboMeter = math.max(1, comboMeter - dt * comboFadingRate)
@@ -113,9 +122,10 @@ function script.update(dt)
         end
       end
 
-      if car.collidedWith == 0 then
+      if car.collidedWith == 0 and collisionCooldown <= 0 then
         handleCollision(player, car) -- Handle collision severity
         state.collided = true
+        collisionCooldown = collisionCooldownDuration -- Start cooldown
       end
 
       if not state.overtaken and not state.collided and state.drivingAlong then
@@ -141,6 +151,7 @@ function script.update(dt)
   end
 end
 
+-- Rest of the script (UI and message handling) remains unchanged
 -- Rest of the script (UI and message handling) remains unchanged
 
 -- For various reasons, this is the most questionable part, some UI. I don’t really like
