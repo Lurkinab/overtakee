@@ -52,9 +52,6 @@ local function handleCollision(player, otherCar)
   if collisionCounter >= maxCollisions then
     resetScore()
     collisionCounter = 0 -- Reset collision counter
-    addMessage('Too many collisions! Score reset.', -1)
-  else
-    addMessage('Collision: Lost 1000 points. Collisions: ' .. collisionCounter .. '/' .. maxCollisions, -1)
   end
 
   -- Start cooldown
@@ -67,10 +64,6 @@ local function isCarNearby(player, car, radius)
 end
 
 function script.update(dt)
-  if timePassed == 0 then
-    addMessage('Let’s go!', 0)
-  end
-
   local player = ac.getCarState(1)
   local sim = ac.getSimState()
 
@@ -98,8 +91,6 @@ function script.update(dt)
   if player.speedKmh < requiredSpeed then 
     if dangerouslySlowTimer > 10 then    
       resetScore()
-    else
-      if dangerouslySlowTimer == 0 then addMessage('Too slow!', -1) end
     end
     dangerouslySlowTimer = dangerouslySlowTimer + dt
     comboMeter = 1
@@ -125,7 +116,6 @@ function script.update(dt)
         if not state.nearMiss and isCarNearby(player, car, 1) then
           state.nearMiss = true
           comboMeter = comboMeter + 1
-          addMessage('Near miss: bonus combo', 0)
         end
       end
 
@@ -160,26 +150,8 @@ function script.update(dt)
 end
 
 -- UI and message handling
-local messages = {}
-
-function addMessage(text, mood)
-  if #messages >= 4 then
-    table.remove(messages, 4)
-  end
-  table.insert(messages, 1, { text = text, age = 0, targetPos = 1, currentPos = 1, mood = mood })
-end
-
-local function updateMessages(dt)
-  for i = 1, #messages do
-    local m = messages[i]
-    m.age = m.age + dt
-    m.currentPos = math.applyLag(m.currentPos, m.targetPos, 0.8, dt)
-  end
-end
-
 function script.drawUI()
   local uiState = ac.getUiState()
-  updateMessages(uiState.dt)
 
   -- UI colors
   local backgroundColor = rgbm(0.1, 0.1, 0.1, 0.9) -- Dark background
@@ -187,19 +159,20 @@ function script.drawUI()
   local comboColorUI = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
   -- Draw the score and collision counter
-  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 150, 100), vec2(300, 200))
+  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 150, 100), vec2(300, 150))
   ui.beginOutline()
 
   -- Draw background
-  ui.drawRectFilled(vec2(0, 0), vec2(300, 200), backgroundColor, 1)
+  ui.drawRectFilled(vec2(0, 0), vec2(300, 150), backgroundColor, 1)
 
-  -- Multipliers on top
+  -- Multipliers side by side
   ui.pushFont(ui.Font.Main)
-  ui.textColored('1.0X  Speed', textColor)
-  ui.offsetCursorY(10)
-  ui.textColored('1.0X  Proximity', textColor)
-  ui.offsetCursorY(10)
-  ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'X  Combo', comboColorUI)
+  ui.setCursor(vec2(10, 10))
+  ui.textColored('1.0X Speed', textColor)
+  ui.sameLine(0, 20)
+  ui.textColored('1.0X Proximity', textColor)
+  ui.sameLine(0, 20)
+  ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'X Combo', comboColorUI)
   ui.popFont()
 
   -- Score
@@ -212,22 +185,6 @@ function script.drawUI()
   ui.offsetCursorY(10)
   ui.pushFont(ui.Font.Main)
   ui.textColored(collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1)) -- Red text for collisions
-  ui.popFont()
-
-  -- PB (Personal Best)
-  ui.offsetCursorY(20)
-  ui.pushFont(ui.Font.Main)
-  ui.textColored('PB: ' .. highestScore, textColor)
-  ui.popFont()
-
-  -- Messages
-  ui.offsetCursorY(10)
-  ui.pushFont(ui.Font.Main)
-  for i = 1, #messages do
-    local m = messages[i]
-    ui.setCursor(vec2(20, 160 + (i - 1) * 20))
-    ui.textColored(m.text, m.mood == 1 and rgbm(0, 1, 0, 1) or m.mood == -1 and rgbm(1, 0, 0, 1) or textColor)
-  end
   ui.popFont()
 
   ui.endOutline(rgbm(0, 0, 0, 0.3))
