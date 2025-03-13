@@ -14,8 +14,8 @@ local maxCollisions = 5 -- Maximum allowed collisions before score reset
 
 -- This function is called before event activates. Once it returns true, it’ll run:
 function script.prepare(dt)
-  ac.debug('speed', ac.getCarState(1).speedKmh)
-  return ac.getCarState(1).speedKmh > 60
+  ac.debug('speed', ac.getCarState(0).speedKmh)
+  return ac.getCarState(0).speedKmh > 60
 end
 
 -- Event state:
@@ -64,7 +64,7 @@ local function isCarNearby(player, car, radius)
 end
 
 function script.update(dt)
-  local player = ac.getCarState(1)
+  local player = ac.getCarState(0)
   local sim = ac.getSimState()
 
   -- Reset score if engine is dead
