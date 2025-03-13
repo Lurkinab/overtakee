@@ -20,7 +20,7 @@ local eventState = {
   totalScore = 0,
   comboMeter = 1,
   comboColor = 0,
-  highestScore = ac.storage.get("highestScore") or 0, -- Load highest score from storage
+  highestScore = 0, -- Highest score for the current session
   dangerouslySlowTimer = 0,
   carsState = {},
   wheelsWarningTimeout = 0,
@@ -42,7 +42,6 @@ local function handleCollision(player, otherCar)
   -- Update highest score before resetting
   if eventState.totalScore > eventState.highestScore then
     eventState.highestScore = eventState.totalScore
-    ac.storage.set("highestScore", eventState.highestScore) -- Save highest score to storage
     ac.sendChatMessage("New high score: " .. eventState.highestScore)
   end
 
@@ -132,7 +131,6 @@ function script.update(dt)
   if not player or player.engineLifeLeft < 1 then
     if eventState.totalScore > eventState.highestScore then
       eventState.highestScore = math.floor(eventState.totalScore)
-      ac.storage.set("highestScore", eventState.highestScore) -- Save highest score to storage
       ac.sendChatMessage("Scored " .. eventState.totalScore .. " points.")
     end
     eventState.totalScore = 0
@@ -164,7 +162,6 @@ function script.update(dt)
     if eventState.dangerouslySlowTimer > 10 then
       if eventState.totalScore > eventState.highestScore then
         eventState.highestScore = math.floor(eventState.totalScore)
-        ac.storage.set("highestScore", eventState.highestScore) -- Save highest score to storage
         ac.sendChatMessage("New high score: " .. eventState.highestScore)
       end
       eventState.totalScore = 0
