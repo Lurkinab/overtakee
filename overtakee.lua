@@ -83,8 +83,8 @@ function script.update(dt)
   -- Cap the combo multiplier at maxComboMultiplier
   comboMeter = math.min(comboMeter, maxComboMultiplier)
 
-  -- Combo fading rate based on speed and wheels outside
-  local comboFadingRate = 0.5 * math.lerp(1, 0.1, math.lerpInvSat(player.speedKmh, 80, 200)) + player.wheelsOutside
+  -- Adjust combo fading rate to be slower, giving more time for chaining combos
+  local comboFadingRate = 0.25 * math.lerp(1, 0.1, math.lerpInvSat(player.speedKmh, 80, 200)) + player.wheelsOutside
   comboMeter = math.max(1, comboMeter - dt * comboFadingRate)
 
   -- Check if player is too slow
@@ -175,11 +175,11 @@ function script.drawUI()
   ui.textColored(math.ceil(comboMeter * 10) / 10 .. 'X Combo', comboColorUI)
   ui.popFont()
 
-  -- Score and collision counter
+  -- Score and enlarged collision counter with slanted font
   ui.offsetCursorY(20)
   ui.pushFont(ui.Font.Huge)
   ui.textColored(totalScore .. ' PTS', textColor)
-  ui.sameLine(0, 20)
+  ui.sameLine(0, 50)  -- Move collision counter further to the right
   ui.pushFont(ui.Font.Main)
   ui.textColored(collisionCounter .. '/' .. maxCollisions, rgbm(1, 0, 0, 1)) -- Red text for collisions
   ui.popFont()
@@ -189,6 +189,18 @@ function script.drawUI()
   ui.offsetCursorY(20)
   ui.pushFont(ui.Font.Main)
   ui.textColored('PB: ' .. highestScore, textColor)
+  ui.popFont()
+
+  -- Leaderboard section with clean layout
+  ui.offsetCursorY(20)
+  ui.pushFont(ui.Font.Main)
+  ui.textColored('Leaderboards:', textColor)
+  for i = 1, sim.carsCount do
+    local car = ac.getCarState(i)
+    local playerName = ac.getDriverName(i)
+    local playerPB = carsState[i] and carsState[i].highestScore or 0
+    ui.textColored(playerName .. ": " .. playerPB .. " PTS", textColor)
+  end
   ui.popFont()
 
   ui.endOutline(rgbm(0, 0, 0, 0.3))
