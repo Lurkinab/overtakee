@@ -153,20 +153,24 @@ function script.update(dt)
 end
 
 -- UI and message handling
+local uiPosition = vec2(uiState.windowSize.x * 0.5 - 250, 100) -- Initial position of the UI
+local isDragging = false -- Track if the UI is being dragged
+
 function script.drawUI()
   local uiState = ac.getUiState()
 
   -- UI colors
-  local backgroundColor = rgbm(0.1, 0.1, 0.1, 0.9) -- Dark background
   local textColor = rgbm(1, 1, 1, 1) -- White text
   local comboColorUI = rgbm.new(hsv(comboColor, math.saturate(comboMeter / 10), 1):rgb(), math.saturate(comboMeter / 4))
 
-  -- Draw the score and collision counter
-  ui.beginTransparentWindow('overtakeScore', vec2(uiState.windowSize.x * 0.5 - 250, 100), vec2(500, 300))
+  -- Make the UI movable
+  ui.beginTransparentWindow('overtakeScore', uiPosition, vec2(500, 300), true)
   ui.beginOutline()
 
-  -- Draw background
-  ui.drawRectFilled(vec2(0, 0), vec2(500, 300), backgroundColor, 1)
+  -- Check if the UI is being dragged
+  if ui.isMouseDragging() and ui.isMouseHoveringWindow() then
+    uiPosition = uiPosition + ui.getMouseDragDelta()
+  end
 
   -- Multipliers side by side
   ui.pushFont(ui.Font.Main)
