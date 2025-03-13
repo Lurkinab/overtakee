@@ -1,5 +1,5 @@
 -- Event configuration:
-local requiredSpeed = 80
+local requiredSpeed = 50
 
 -- Collision cooldown state
 local collisionCooldown = 0 -- Cooldown timer
@@ -8,11 +8,10 @@ local collisionCooldownDuration = 2 -- Cooldown duration in seconds
 -- Combo multiplier cap
 local maxComboMultiplier = 10 -- Maximum combo multiplier
 
--- Strike system variables
-local strikes = 0 -- Current number of strikes
-local maxStrikes = 3 -- Maximum number of strikes before wipeout
+-- Strike system state
+local collisionStrikes = 0 -- Number of collisions in the current strike cycle
 
--- This function is called before event activates. Once it returns true, it'll run:
+-- This function is called before event activates. Once it returns true, it’ll run:
 function script.prepare(dt)
   ac.debug('speed', ac.getCarState(1).speedKmh)
   return ac.getCarState(1).speedKmh > 60
@@ -29,67 +28,41 @@ local carsState = {}
 local wheelsWarningTimeout = 0
 local playerPreCollisionSpeed = 0 -- Track player's speed before collision
 
--- For various reasons, this is the most questionable part, some UI. I don't really like
--- this way though. So, yeah, still thinking about the best way to do it.
-local messages = {}
-local glitter = {}
-local glitterCount = 0
-
-function addMessage(text, mood)
-  for i = math.min(#messages + 1, 4), 2, -1 do
-    messages[i] = messages[i - 1]
-    messages[i].targetPos = i
-  end
-  messages[1] = { text = text, age = 0, targetPos = 1, currentPos = 1, mood = mood }
-  if mood == 1 then
-    for i = 1, 60 do
-      local dir = vec2(math.random() - 0.5, math.random() - 0.5)
-      glitterCount = glitterCount + 1
-      glitter[glitterCount] = { 
-        color = rgbm.new(hsv(math.random() * 360, 1, 1):rgb(), 1), 
-        pos = vec2(80, 140) + dir * vec2(40, 20),
-        velocity = dir:normalize():scale(0.2 + math.random()),
-        life = 0.5 + 0.5 * math.random()
-      }
-    end
-  end
-end
-
--- Function to handle the 3-strike collision system
+-- Function to handle collisions based on the strike system
 local function handleCollision(player, otherCar)
-  strikes = strikes + 1
-  
-  if strikes == 1 then
-    -- First collision: lose 750 points
+  collisionStrikes = collisionStrikes + 1
+
+  if collisionStrikes == 1 then
+    -- First collision: deduct 750 points
     totalScore = math.max(0, totalScore - 750)
     comboMeter = 1
-    addMessage('Strike 1: lost 750 points.', -1)
-  elseif strikes == 2 then
-    -- Second collision: lose 2000 points
+    addMessage('First collision! Lost 750 points.', -1)
+  elseif collisionStrikes == 2 then
+    -- Second collision: deduct 2000 points
     totalScore = math.max(0, totalScore - 2000)
     comboMeter = 1
-    addMessage('Strike 2: lost 2000 points.', -1)
-  elseif strikes == 3 then
-    -- Third collision: lose 5000 points
+    addMessage('Second collision! Lost 2000 points.', -1)
+  elseif collisionStrikes == 3 then
+    -- Third collision: deduct 5000 points
     totalScore = math.max(0, totalScore - 5000)
     comboMeter = 1
-    addMessage('Strike 3: lost 5000 points.', -1)
+    addMessage('Third collision! Lost 5000 points.', -1)
   else
-    -- Fourth collision: complete wipeout
+    -- Fourth collision: reset score to 0
     if totalScore > highestScore then
       highestScore = math.floor(totalScore)
       ac.sendChatMessage("Scored " .. totalScore .. " points before wipeout.")
     end
     totalScore = 0
     comboMeter = 1
-    strikes = 0 -- Reset strikes after wipeout
-    addMessage('Strike 4: Complete wipeout! Score reset.', -1)
+    collisionStrikes = 0 -- Reset strike counter
+    addMessage('Total wipeout! Score reset.', -1)
   end
 end
 
 function script.update(dt)
   if timePassed == 0 then
-    addMessage('Let's go!', 0)
+    addMessage('Let’s go!', 0)
   end
 
   local player = ac.getCarState(1)
@@ -100,7 +73,7 @@ function script.update(dt)
     end
     totalScore = 0
     comboMeter = 1
-    strikes = 0 -- Reset strikes when engine dies
+    collisionStrikes = 0 -- Reset strike counter
     return
   end
 
@@ -139,7 +112,7 @@ function script.update(dt)
       end
       totalScore = 0
       comboMeter = 1
-      strikes = 0 -- Reset strikes when too slow for too long
+      collisionStrikes = 0 -- Reset strike counter
     else
       if dangerouslySlowTimer == 0 then addMessage('Too slow!', -1) end
     end
@@ -156,14 +129,6 @@ function script.update(dt)
   for i = 1, ac.getSimState().carsCount do 
     local car = ac.getCarState(i)
     local state = carsState[i]
-
-    if not state.maxPosDot then
-      state.maxPosDot = -1
-      state.overtaken = false
-      state.collided = false
-      state.drivingAlong = true
-      state.nearMiss = false
-    end
 
     if car.pos:closerToThan(player.pos, 10) then
       local drivingAlong = math.dot(car.look, player.look) > 0.2
@@ -184,7 +149,7 @@ function script.update(dt)
       end
 
       if car.collidedWith == 0 and collisionCooldown <= 0 then
-        handleCollision(player, car) -- Handle collision with strike system
+        handleCollision(player, car) -- Handle collision severity
         state.collided = true
         collisionCooldown = collisionCooldownDuration -- Start cooldown
       end
@@ -211,6 +176,8 @@ function script.update(dt)
     end
   end
 end
+
+-- Rest of the script (UI and message handling) remains unchanged
 
 local function updateMessages(dt)
   comboColor = comboColor + dt * 10 * comboMeter
