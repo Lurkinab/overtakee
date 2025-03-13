@@ -5,9 +5,9 @@ local rect24URL = "https://i.imgur.com/NH2Lqpr.png" -- Combo multiplier backgrou
 local rect12 = ac.loadTextureFromURL(rect12URL) -- PTS background
 local rect24 = ac.loadTextureFromURL(rect24URL) -- Combo multiplier background
 
--- Define positions for the UI elements
-local rect12Pos = vec2(100, 100) -- Position for PTS
-local rect24Pos = vec2(100, 150) -- Position for Combo Multiplier
+-- Define positions for the UI elements (same as the old UI positions)
+local rect12Pos = vec2(100, 100) -- Position for PTS (same as old UI)
+local rect24Pos = vec2(100, 150) -- Position for Combo Multiplier (same as old UI)
 
 -- Event configuration:
 local requiredSpeed = 80
