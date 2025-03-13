@@ -1,3 +1,14 @@
+-- Load PNG files from Imgur URLs
+local rect12URL = "https://i.imgur.com/xtnd7HL.png" -- PTS background
+local rect24URL = "https://i.imgur.com/NH2Lqpr.png" -- Combo multiplier background
+
+local rect12 = ac.loadTextureFromURL(rect12URL) -- PTS background
+local rect24 = ac.loadTextureFromURL(rect24URL) -- Combo multiplier background
+
+-- Define positions for the UI elements
+local rect12Pos = vec2(100, 100) -- Position for PTS
+local rect24Pos = vec2(100, 150) -- Position for Combo Multiplier
+
 -- Event configuration:
 local requiredSpeed = 80
 
@@ -234,6 +245,15 @@ function script.drawUI()
   local uiState = ac.getUiState()
   updateMessages(uiState.dt)
 
+  -- Draw the background textures
+  ac.drawTexture(rect12, rect12Pos, vec2(rect12:getWidth(), rect12:getHeight()))
+  ac.drawTexture(rect24, rect24Pos, vec2(rect24:getWidth(), rect24:getHeight()))
+
+  -- Draw dynamic text on top of the textures
+  ac.drawText(rect12Pos + vec2(10, 10), string.format("PTS: %d", totalScore), rgb(255, 255, 255)) -- White text for PTS
+  ac.drawText(rect24Pos + vec2(10, 10), string.format("Combo: %.1fX", comboMeter), rgb(0, 255, 0)) -- Green text for Combo
+
+  -- Rest of your existing UI code
   local speedRelative = math.saturate(math.floor(ac.getCarState(1).speedKmh) / requiredSpeed)
   speedWarning = math.applyLag(speedWarning, speedRelative < 1 and 1 or 0, 0.5, uiState.dt)
 
