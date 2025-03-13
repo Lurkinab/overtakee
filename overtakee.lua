@@ -33,9 +33,6 @@ local eventState = {
 
 -- Function to handle collisions
 local function handleCollision(player, otherCar)
-  local speedLoss = eventState.playerPreCollisionSpeed - player.speedKmh
-  ac.debug('Collision detected!', 'Speed loss: ' .. speedLoss)
-
   -- Increment crash count
   eventState.crashCount = eventState.crashCount + 1
 
